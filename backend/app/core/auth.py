@@ -29,10 +29,6 @@ def extract_session_token(request: Request) -> str | None:
     if token:
         return token
 
-    header_token = request.headers.get("X-Session-Token")
-    if header_token:
-        return header_token
-
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         return auth_header[7:].strip()

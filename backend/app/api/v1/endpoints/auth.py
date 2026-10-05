@@ -94,7 +94,6 @@ def login(
         samesite="lax",
         path="/",
     )
-    response.headers["X-Session-Token"] = token
     return _session_user(user, organization, role)
 
 
@@ -141,6 +140,5 @@ def logout(
         samesite="lax",
         path="/",
     )
-    response.headers["X-Session-Token"] = ""
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
