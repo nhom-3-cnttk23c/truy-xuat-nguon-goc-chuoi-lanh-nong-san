@@ -9,13 +9,35 @@ from app.core.auth import Principal, get_current_principal
 logger = logging.getLogger(__name__)
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "grower": frozenset({"auth:session", "farms:read", "farms:write", "lots:read"}),
-    "cooperative": frozenset({"auth:session", "lots:read"}),
-    "transporter": frozenset({"auth:session", "lots:read"}),
-    "distributor": frozenset({"auth:session", "lots:read"}),
-    "inspector": frozenset({"auth:session", "lots:read_all"}),
+    "grower": frozenset(
+        {
+            "auth:session",
+            "farms:read",
+            "farms:write",
+            "lots:read",
+            "events:read",
+            "events:create",
+        }
+    ),
+    "cooperative": frozenset(
+        {"auth:session", "lots:read", "events:read", "events:create"}
+    ),
+    "transporter": frozenset(
+        {"auth:session", "lots:read", "events:read", "events:create"}
+    ),
+    "distributor": frozenset(
+        {"auth:session", "lots:read", "events:read", "events:create"}
+    ),
+    "inspector": frozenset({"auth:session", "lots:read_all", "events:read_all"}),
     "organization_admin": frozenset(
-        {"auth:session", "farms:read", "farms:write", "lots:read"}
+        {
+            "auth:session",
+            "farms:read",
+            "farms:write",
+            "lots:read",
+            "events:read",
+            "events:create",
+        }
     ),
     "system_admin": frozenset({"auth:session"}),
 }
@@ -25,7 +47,11 @@ def has_permission(role: str, permission: str) -> bool:
     permissions = ROLE_PERMISSIONS.get(role, frozenset())
     if permission in permissions:
         return True
-    return permission == "lots:read" and "lots:read_all" in permissions
+    if permission == "lots:read" and "lots:read_all" in permissions:
+        return True
+    if permission == "events:read" and "events:read_all" in permissions:
+        return True
+    return False
 
 
 def require_permission(

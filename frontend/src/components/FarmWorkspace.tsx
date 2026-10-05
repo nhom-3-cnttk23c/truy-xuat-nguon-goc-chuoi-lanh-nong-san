@@ -318,7 +318,13 @@ export function FarmWorkspace({
               </div>
             </section>
 
-            {activeTab === 'lots' && <LotsPanel canReadLots={canReadLots} />}
+            {activeTab === 'lots' && (
+              <LotsPanel
+                canReadLots={canReadLots}
+                canReadEvents={hasPermission(user.role, 'events:read')}
+              />
+            )}
+
 
             {activeTab === 'overview' && (
               <>

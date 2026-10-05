@@ -54,3 +54,15 @@ stable when a farm is renamed.
 Lots have stable IDs and foreign keys to both their organization and farm.
 Ordinary users see lots from their own organization; inspectors can read all
 organizations. The API exposes no lot write routes.
+
+### 4. Events (Cold Chain Traceability Log — N3-20 & N3-21)
+
+- List events: GET /api/v1/events/
+- Read an event: GET /api/v1/events/{event_id}
+- Record an event: POST /api/v1/events/
+
+#### Nguyên tắc bất biến và chỉ ghi nối tiếp (N3-21):
+- **Không có đường sửa hay xoá:** API hoàn toàn không cung cấp các route `PUT`, `PATCH`, hay `DELETE` cho thực thể sự kiện. Mọi yêu cầu thay đổi qua HTTP method này đều trả về `405 Method Not Allowed`.
+- **RBAC không cấp quyền sửa/xoá:** Các vai trò nghiệp vụ chỉ được cấp quyền `events:create`, `events:read`, hoặc `events:read_all`. Không tồn tại quyền `events:update` hoặc `events:delete`.
+- **Chuỗi băm nối tiếp:** Mỗi sự kiện khi tạo được gắn số thứ tự tăng dần (`sequence_number`), liên kết với mã băm của sự kiện trước (`prev_hash`) và tạo mã băm mới (`event_hash`) theo chuẩn RFC 8785 (Canonical JSON) + SHA-256.
+

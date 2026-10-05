@@ -1,11 +1,14 @@
 import type {
+  CreateEventRequest,
   Farm,
   FarmPayload,
   HealthResponse,
   LoginRequest,
   Lot,
+  LotEvent,
   SessionUser,
 } from '../types'
+
 
 function resolveBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_BASE_URL
@@ -165,3 +168,19 @@ export const updateFarm = (farmId: string, payload: FarmPayload) =>
     method: 'PUT',
     body: JSON.stringify(payload),
   })
+
+export const getEvents = () => request<LotEvent[]>('/api/v1/events/')
+
+export const getEvent = (eventId: string) =>
+  request<LotEvent>(`/api/v1/events/${eventId}`)
+
+export const createEvent = (payload: CreateEventRequest) =>
+  request<LotEvent>('/api/v1/events/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+
+// ARCHITECTURAL GUARANTEE (N3-21):
+// There are NO updateEvent or deleteEvent functions.
+// Events are strictly append-only.
+

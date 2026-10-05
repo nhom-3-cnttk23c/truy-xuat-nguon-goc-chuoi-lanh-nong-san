@@ -24,8 +24,8 @@ def tenant_select(model: Any, principal: Principal | None = None):
 
     _require_tenant_column(model)
 
-    if model.__tablename__ == "lots" and has_permission(
-        principal.role, "lots:read_all"
+    if model.__tablename__ in ("lots", "events") and has_permission(
+        principal.role, f"{model.__tablename__}:read_all"
     ):
         return select(model)
 
