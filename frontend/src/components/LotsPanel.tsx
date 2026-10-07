@@ -257,7 +257,7 @@ export function LotsPanel({ canReadLots, canReadEvents = true }: LotsPanelProps)
           <div
             style={{
               display: 'flex',
-              justify: 'space-between',
+              justifyContent: 'space-between',
               alignItems: 'center',
               padding: '1rem',
               borderTop: '1px solid #e5e7eb'
