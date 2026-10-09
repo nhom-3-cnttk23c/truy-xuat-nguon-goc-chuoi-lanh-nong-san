@@ -68,6 +68,8 @@ class Lot(Base):
             "lot_code",
             unique=True,
         ),
+        Index("ix_lots_parent_batch_id", "parent_batch_id"),
+        Index("ix_lots_root_harvest_id_depth", "root_harvest_id", "lineage_depth"),
     )
 
     id: Mapped[UUID] = mapped_column(

@@ -42,7 +42,9 @@ def upgrade() -> None:
     )
     op.add_column(
         "lots",
-        sa.Column("lineage_depth", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "lineage_depth", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
     )
     op.add_column(
         "lots",
