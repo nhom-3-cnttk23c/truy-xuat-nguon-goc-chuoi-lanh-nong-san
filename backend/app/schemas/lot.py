@@ -51,6 +51,9 @@ class LotRead(BaseModel):
     current_holder_organization_id: UUID
     current_holder_organization_name: str
     status: str
+    parent_batch_id: UUID | None = None
+    lineage_depth: int = 0
+    root_harvest_id: UUID | None = None
     product: ProductRead | None = None
 
 
