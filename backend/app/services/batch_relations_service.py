@@ -46,7 +46,9 @@ def split_lot(
         )
 
     # Pessimistic lock: block concurrent modifications
-    db.execute(select(Lot).where(Lot.id == parent_id).with_for_update(nowait=False))
+    db.execute(
+        select(Lot).where(Lot.id == parent_id).with_for_update(of=Lot, nowait=False)
+    )
 
     lock_id = hash(f"split:{principal.organization_id}:{parent_id}") % (2**31)
     db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
