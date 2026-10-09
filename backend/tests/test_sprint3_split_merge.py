@@ -1,6 +1,6 @@
 """Tests for N3-39: Lot split with lineage tracking and immutable batch events."""
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
@@ -16,7 +16,6 @@ from app.models.batch_relations import BatchRelation
 from app.models.farm import Farm
 from app.models.lot import Lot
 from app.models.product import Product
-from app.models.transaction import Transaction
 from app.schemas.batch_split import SplitChildPayload
 from app.services import batch_relations_service
 from tests.conftest import IdentityFixture
@@ -87,7 +86,7 @@ async def test_split_lot_happy_path_creates_children_and_events(
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
     product = Product(name=f"test-product-{uuid4().hex[:8]}", unit="kg")
-    
+
     # Create parent lot: 100 kg
     parent = Lot(
         organization_id=owner.organization_id,
@@ -105,43 +104,41 @@ async def test_split_lot_happy_path_creates_children_and_events(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Split into 3 children: 50 + 30 + 10 = 90 kg (remainder 10 kg)
     children_payload = [
         SplitChildPayload(name="Child-50kg", quantity=Decimal("50")),
         SplitChildPayload(name="Child-30kg", quantity=Decimal("30")),
         SplitChildPayload(name="Child-10kg", quantity=Decimal("10")),
     ]
-    
+
     result = batch_relations_service.split_lot(
         admin_session, principal, parent.id, children_payload
     )
-    
+
     # Verify transaction created
     assert result["transaction_id"]
     assert result["parent_id"] == parent.id
     assert len(result["children"]) == 3
-    
+
     # Verify children properties
-    for i, child in enumerate(result["children"]):
+    for child in result["children"]:
         assert child.parent_batch_id == parent.id
         assert child.lineage_depth == 1
         assert child.root_harvest_id == parent.id  # Parent is root
         assert child.status == "active"
         admin_session.refresh(child)
         assert child.organization_id == owner.organization_id
-    
+
     # Verify batch_relations created
     relations = admin_session.scalars(
-        select(BatchRelation).where(
-            BatchRelation.parent_batch_id == parent.id
-        )
+        select(BatchRelation).where(BatchRelation.parent_batch_id == parent.id)
     ).all()
     assert len(relations) == 3
     for rel in relations:
         assert rel.op_type == "split"
         assert rel.weight_transferred in (Decimal("50"), Decimal("30"), Decimal("10"))
-    
+
     # Verify batch_events created (1 split_initiated + 3 created_from_split = 4 total)
     parent_events = admin_session.scalars(
         select(BatchEvent).where(BatchEvent.batch_id == parent.id)
@@ -150,7 +147,7 @@ async def test_split_lot_happy_path_creates_children_and_events(
     assert parent_events[0].event_type == "split_initiated"
     assert parent_events[0].hash  # Has hash
     assert parent_events[0].prev_hash == "0" * 64  # Genesis
-    
+
     child_events = admin_session.scalars(
         select(BatchEvent).where(
             BatchEvent.batch_id.in_([c.id for c in result["children"]])
@@ -160,7 +157,7 @@ async def test_split_lot_happy_path_creates_children_and_events(
     for evt in child_events:
         assert evt.event_type == "created_from_split"
         assert evt.hash
-    
+
     _cleanup_lots(admin_session, [parent.id] + [c.id for c in result["children"]])
 
 
@@ -171,7 +168,7 @@ async def test_split_lot_rejects_mass_conservation_violation(
     """Split should reject if Σ(children) > remaining_quantity."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     # Parent: 100 kg
     parent = Lot(
         organization_id=owner.organization_id,
@@ -189,20 +186,21 @@ async def test_split_lot_rejects_mass_conservation_violation(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Attempt split: 60 + 50 = 110 > 100 (violation)
     children_payload = [
         SplitChildPayload(name="C1", quantity=Decimal("60")),
         SplitChildPayload(name="C2", quantity=Decimal("50")),
     ]
-    
+
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         batch_relations_service.split_lot(
             admin_session, principal, parent.id, children_payload
         )
     assert exc_info.value.status_code == 409  # Conflict
-    
+
     _cleanup_lots(admin_session, [parent.id])
 
 
@@ -212,7 +210,7 @@ async def test_split_lot_via_api_endpoint(admin_session: Session, identity_facto
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
     product = Product(name=f"test-product-{uuid4().hex[:8]}", unit="kg")
-    
+
     parent = Lot(
         organization_id=owner.organization_id,
         current_holder_organization_id=owner.organization_id,
@@ -230,7 +228,7 @@ async def test_split_lot_via_api_endpoint(admin_session: Session, identity_facto
 
     async with _client() as client:
         await _login(client, owner)
-        
+
         response = await client.post(
             f"/api/v1/lots/{parent.id}/split",
             json={
@@ -242,22 +240,24 @@ async def test_split_lot_via_api_endpoint(admin_session: Session, identity_facto
                 "note": None,
             },
         )
-    
+
     assert response.status_code == 200, response.text
     data = response.json()
     assert "transaction_id" in data
     assert data["parent_id"] == str(parent.id)
     assert len(data["children"]) == 3
-    
+
     _cleanup_lots(admin_session, [parent.id] + [c["id"] for c in data["children"]])
 
 
 @pytest.mark.asyncio
-async def test_trace_lot_origin_to_root_harvest(admin_session: Session, identity_factory):
+async def test_trace_lot_origin_to_root_harvest(
+    admin_session: Session, identity_factory
+):
     """Trace child → parent → root via lineage."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     # Create root harvest lot
     root = Lot(
         organization_id=owner.organization_id,
@@ -280,7 +280,7 @@ async def test_trace_lot_origin_to_root_harvest(admin_session: Session, identity
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Split root into child
     children_payload = [
         SplitChildPayload(name="Child-50", quantity=Decimal("50")),
@@ -289,14 +289,14 @@ async def test_trace_lot_origin_to_root_harvest(admin_session: Session, identity
         admin_session, principal, root.id, children_payload
     )
     child = result["children"][0]
-    
+
     # Trace child back to root
     origin = batch_relations_service.trace_to_root_harvest(
         admin_session, principal, child.id
     )
     assert origin["root_harvest_id"] == root.id
     assert origin["lineage_depth"] == 1
-    
+
     _cleanup_lots(admin_session, [root.id, child.id])
 
 
@@ -307,7 +307,7 @@ async def test_get_batch_children_returns_direct_children_only(
     """get_batch_children should return direct children, not grandchildren."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     # Create parent
     parent = Lot(
         organization_id=owner.organization_id,
@@ -325,7 +325,7 @@ async def test_get_batch_children_returns_direct_children_only(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Split parent → 2 children
     children_payload = [
         SplitChildPayload(name="C1", quantity=Decimal("50")),
@@ -335,14 +335,14 @@ async def test_get_batch_children_returns_direct_children_only(
         admin_session, principal, parent.id, children_payload
     )
     child1, child2 = result1["children"]
-    
+
     # Get children of parent
     children_of_parent = batch_relations_service.get_batch_children(
         admin_session, principal, parent.id
     )
     assert len(children_of_parent) == 2
     assert {c.id for c in children_of_parent} == {child1.id, child2.id}
-    
+
     _cleanup_lots(admin_session, [parent.id, child1.id, child2.id])
 
 
@@ -353,7 +353,7 @@ async def test_batch_events_immutability_prevents_update_delete(
     """Verify batch_events table has BEFORE UPDATE/DELETE triggers."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     parent = Lot(
         organization_id=owner.organization_id,
         current_holder_organization_id=owner.organization_id,
@@ -370,29 +370,30 @@ async def test_batch_events_immutability_prevents_update_delete(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     children_payload = [
         SplitChildPayload(name="C1", quantity=Decimal("100")),
     ]
     result = batch_relations_service.split_lot(
         admin_session, principal, parent.id, children_payload
     )
-    
+
     # Retrieve event
     event = admin_session.scalar(
         select(BatchEvent).where(BatchEvent.batch_id == parent.id)
     )
     assert event
-    
+
     # Attempt UPDATE → should raise exception
     from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
+
     try:
         event.payload = {"tampered": True}
         admin_session.commit()
         pytest.fail("Expected exception when updating batch_events")
     except SQLAlchemyIntegrityError:
         admin_session.rollback()  # Expected
-    
+
     # Attempt DELETE → should raise exception
     try:
         admin_session.delete(event)
@@ -400,5 +401,5 @@ async def test_batch_events_immutability_prevents_update_delete(
         pytest.fail("Expected exception when deleting batch_events")
     except SQLAlchemyIntegrityError:
         admin_session.rollback()  # Expected
-    
+
     _cleanup_lots(admin_session, [parent.id] + [c.id for c in result["children"]])

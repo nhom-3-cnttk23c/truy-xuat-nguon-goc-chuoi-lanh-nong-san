@@ -87,9 +87,7 @@ def upgrade() -> None:
     op.create_table(
         "transactions",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "initiator_user_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("initiator_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "initiator_organization_id", postgresql.UUID(as_uuid=True), nullable=False
         ),
@@ -111,7 +109,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("committed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("op_type IN ('split', 'merge')", name="ck_transactions_op_type"),
+        sa.CheckConstraint(
+            "op_type IN ('split', 'merge')", name="ck_transactions_op_type"
+        ),
         sa.CheckConstraint(
             "status IN ('pending', 'committed', 'rolled_back')",
             name="ck_transactions_status",
@@ -139,9 +139,7 @@ def upgrade() -> None:
     op.create_table(
         "batch_relations",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "transaction_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("transaction_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("parent_batch_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("child_batch_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
@@ -223,9 +221,7 @@ def upgrade() -> None:
         sa.Column("prev_hash", sa.String(length=64), nullable=False),
         sa.Column("hash", sa.String(length=64), nullable=False),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "transaction_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("transaction_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column(
             "recorded_at",
             sa.DateTime(timezone=True),
@@ -233,9 +229,13 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint("length(event_type) > 0", name="ck_batch_events_event_type"),
-        sa.CheckConstraint("length(prev_hash) = 64", name="ck_batch_events_prev_hash_len"),
+        sa.CheckConstraint(
+            "length(prev_hash) = 64", name="ck_batch_events_prev_hash_len"
+        ),
         sa.CheckConstraint("length(hash) = 64", name="ck_batch_events_hash_len"),
-        sa.UniqueConstraint("batch_id", "event_id", name="uq_batch_events_batch_event_id"),
+        sa.UniqueConstraint(
+            "batch_id", "event_id", name="uq_batch_events_batch_event_id"
+        ),
         sa.UniqueConstraint("batch_id", "hash", name="uq_batch_events_batch_hash"),
         sa.ForeignKeyConstraint(
             ["batch_id"],
@@ -362,9 +362,7 @@ def upgrade() -> None:
     role = _application_role()
     if role:
         op.execute(f"GRANT SELECT, INSERT ON transactions TO {role}")
-        op.execute(
-            f"GRANT UPDATE (status, committed_at) ON transactions TO {role}"
-        )
+        op.execute(f"GRANT UPDATE (status, committed_at) ON transactions TO {role}")
         op.execute(f"GRANT SELECT, INSERT ON batch_relations TO {role}")
         op.execute(f"GRANT SELECT, INSERT ON batch_events TO {role}")
 
@@ -374,9 +372,7 @@ def downgrade() -> None:
     if role:
         op.execute(f"REVOKE SELECT, INSERT ON batch_events FROM {role}")
         op.execute(f"REVOKE SELECT, INSERT ON batch_relations FROM {role}")
-        op.execute(
-            f"REVOKE UPDATE (status, committed_at) ON transactions FROM {role}"
-        )
+        op.execute(f"REVOKE UPDATE (status, committed_at) ON transactions FROM {role}")
         op.execute(f"REVOKE SELECT, INSERT ON transactions FROM {role}")
 
     op.execute("ALTER TABLE batch_events NO FORCE ROW LEVEL SECURITY")

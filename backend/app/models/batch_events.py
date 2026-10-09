@@ -2,8 +2,16 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgreSQLUUID
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -12,7 +20,7 @@ from app.models.transaction import Transaction
 
 class BatchEvent(Base):
     """Immutable, append-only event record for lot split/merge operations.
-    
+
     Like Event, but specifically for tracking lineage operations (split, merge).
     Enforced immutable at DB level with BEFORE UPDATE/DELETE triggers.
     """

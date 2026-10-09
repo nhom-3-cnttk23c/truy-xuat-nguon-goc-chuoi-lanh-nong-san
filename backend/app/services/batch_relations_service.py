@@ -1,7 +1,6 @@
 """Service for splitting lots into multiple child lots with lineage tracking."""
 
-from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, text
@@ -26,7 +25,7 @@ def split_lot(
 ) -> dict:
     """
     Atomically split a parent lot into multiple child lots.
-    
+
     Ensures:
     1. Parent lot is accessible and current_holder is caller's org
     2. Σ(child quantities) ≤ parent remaining_quantity
@@ -34,12 +33,12 @@ def split_lot(
     4. All children created in single transaction
     5. All events (split_initiated + created_from_split) appended with hash chain
     6. lineage_depth and root_harvest_id pre-computed for fast queries
-    
+
     Returns:
         Dict with 'transaction_id', 'parent_id', and 'children' (list of created Lot objects)
     """
     parent = get_tenant_record(db, Lot, parent_id, principal)
-    
+
     if parent.current_holder_organization_id != principal.organization_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -47,17 +46,13 @@ def split_lot(
         )
 
     # Pessimistic lock: block concurrent modifications
-    db.execute(
-        select(Lot)
-        .where(Lot.id == parent_id)
-        .with_for_update(nowait=False)
-    )
-    
+    db.execute(select(Lot).where(Lot.id == parent_id).with_for_update(nowait=False))
+
     lock_id = hash(f"split:{principal.organization_id}:{parent_id}") % (2**31)
     db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
 
     total_children_qty = sum(child.quantity for child in children_payload)
-    
+
     if total_children_qty > parent.remaining_quantity:
         unit = parent.product.unit if parent.product else "kg"
         raise HTTPException(
@@ -124,7 +119,7 @@ def split_lot(
         "remainder": str(parent.remaining_quantity - total_children_qty),
     }
     parent_hash = compute_event_hash(GENESIS_PREV_HASH, parent_payload)
-    
+
     db.add(
         BatchEvent(
             batch_id=parent_id,
@@ -146,7 +141,7 @@ def split_lot(
             "lot_code": child.lot_code,
         }
         child_hash = compute_event_hash(GENESIS_PREV_HASH, child_payload_dict)
-        
+
         db.add(
             BatchEvent(
                 batch_id=child.id,
@@ -162,7 +157,7 @@ def split_lot(
     transaction.status = "committed"
     db.flush()
     db.commit()
-    
+
     db.refresh(transaction)
     for child in created_children:
         db.refresh(child)
@@ -181,7 +176,7 @@ def get_batch_children(
 ) -> list[Lot]:
     """Get direct children (1 level) of a parent lot via batch_relations."""
     get_tenant_record(db, Lot, parent_id, principal)  # Verify access
-    
+
     return db.scalars(
         select(Lot)
         .join(
@@ -202,8 +197,8 @@ def get_batch_parents(
     child_id: UUID,
 ) -> list[Lot]:
     """Get direct parents of a child lot via batch_relations."""
-    child = get_tenant_record(db, Lot, child_id, principal)
-    
+    _ = get_tenant_record(db, Lot, child_id, principal)
+
     parents = db.scalars(
         select(Lot)
         .join(
@@ -215,7 +210,7 @@ def get_batch_parents(
             BatchRelation.op_type == "split",
         )
     ).all()
-    
+
     return list(parents)
 
 
@@ -227,12 +222,12 @@ def trace_to_root_harvest(
 ) -> dict:
     """
     Trace backwards through parent_batch_id chain to find root harvest lot.
-    
+
     Uses denormalized root_harvest_id for O(1) lookup; falls back to recursive CTE
     for complex multi-parent merge scenarios.
     """
     lot = get_tenant_record(db, Lot, lot_id, principal)
-    
+
     if lot.root_harvest_id:
         root = db.scalar(select(Lot).where(Lot.id == lot.root_harvest_id))
         if root:
@@ -243,12 +238,12 @@ def trace_to_root_harvest(
                 "lineage_depth": lot.lineage_depth,
                 "is_ancestor_visible": True,
             }
-    
+
     # Fallback: manual traversal if denormalization missing
     current = lot
     depth = 0
     visited = set()
-    
+
     while current.parent_batch_id and depth < max_depth:
         if current.parent_batch_id in visited:
             raise HTTPException(
@@ -258,7 +253,7 @@ def trace_to_root_harvest(
         visited.add(current.parent_batch_id)
         current = get_tenant_record(db, Lot, current.parent_batch_id, principal)
         depth += 1
-    
+
     return {
         "root_harvest_id": current.id,
         "root_harvest_name": current.name,

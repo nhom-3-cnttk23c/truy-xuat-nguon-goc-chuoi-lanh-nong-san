@@ -69,7 +69,7 @@ def test_concurrent_split_same_parent_first_wins_second_rolled_back(
     """Two concurrent splits on same parent: 1st succeeds, 2nd rolls back."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     # Parent: 100 kg
     parent = Lot(
         organization_id=owner.organization_id,
@@ -87,7 +87,7 @@ def test_concurrent_split_same_parent_first_wins_second_rolled_back(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Simulate two concurrent split attempts that both exceed mass
     children_payload_1 = [
         SplitChildPayload(name="C1a", quantity=Decimal("60")),
@@ -95,27 +95,28 @@ def test_concurrent_split_same_parent_first_wins_second_rolled_back(
     children_payload_2 = [
         SplitChildPayload(name="C2a", quantity=Decimal("50")),
     ]
-    
+
     # First split: succeed
     result1 = batch_relations_service.split_lot(
         admin_session, principal, parent.id, children_payload_1
     )
     assert len(result1["children"]) == 1
-    
+
     # Second split on remaining 40 kg: attempt to split 50 kg → should fail
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         batch_relations_service.split_lot(
             admin_session, principal, parent.id, children_payload_2
         )
     assert exc_info.value.status_code == 409  # Conflict
-    
+
     # Verify only 1st split's children exist
     all_children = admin_session.scalars(
         select(Lot).where(Lot.parent_batch_id == parent.id)
     ).all()
     assert len(all_children) == 1
-    
+
     _cleanup_lots(admin_session, [parent.id] + [c.id for c in result1["children"]])
 
 
@@ -125,7 +126,7 @@ def test_pessimistic_lock_prevents_concurrent_modification(
     """Verify SELECT...FOR UPDATE blocks concurrent access."""
     owner = identity_factory()
     farm = _make_farm(admin_session, owner.organization_id)
-    
+
     parent = Lot(
         organization_id=owner.organization_id,
         current_holder_organization_id=owner.organization_id,
@@ -142,7 +143,7 @@ def test_pessimistic_lock_prevents_concurrent_modification(
     admin_session.commit()
 
     principal = _make_principal(owner)
-    
+
     # Split 1: 50 kg
     result = batch_relations_service.split_lot(
         admin_session,
@@ -150,9 +151,9 @@ def test_pessimistic_lock_prevents_concurrent_modification(
         parent.id,
         [SplitChildPayload(name="C1", quantity=Decimal("50"))],
     )
-    
+
     # Verify pessimistic lock was applied (check via pg_locks would require direct SQL)
     # Instead, verify via transaction record that split succeeded
     assert result["transaction_id"]
-    
+
     _cleanup_lots(admin_session, [parent.id] + [c.id for c in result["children"]])

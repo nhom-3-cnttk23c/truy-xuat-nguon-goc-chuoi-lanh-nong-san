@@ -14,7 +14,7 @@ class SplitChildPayload(BaseModel):
 class LotSplitRequest(BaseModel):
     """Request to split a parent lot into multiple child lots."""
 
-    children: list[SplitChildPayload] = Field(..., min_items=1, max_items=100)
+    children: list[SplitChildPayload] = Field(..., min_length=1, max_length=100)
     note: str | None = Field(None, max_length=500)
 
 

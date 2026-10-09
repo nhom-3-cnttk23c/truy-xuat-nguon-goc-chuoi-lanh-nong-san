@@ -10,11 +10,9 @@ from app.core.database import get_db
 from app.core.tenancy import get_tenant_record
 from app.models.lot import Lot
 from app.schemas.batch_split import (
+    LotOriginTrace,
     LotSplitRequest,
     LotSplitResponse,
-    LotOriginTrace,
-    BatchEventRead,
-    BatchRelationRead,
 )
 from app.schemas.lot import LotCreate, LotListRead, LotRead
 from app.services import batch_relations_service, lot_service
@@ -62,7 +60,9 @@ def get_lot(
     return get_tenant_record(db, Lot, lot_id, principal)
 
 
-@router.post("/{lot_id}/split", response_model=LotSplitResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/{lot_id}/split", response_model=LotSplitResponse, status_code=status.HTTP_200_OK
+)
 @require_permission("lots:create")
 def split_lot(
     lot_id: UUID,
@@ -71,9 +71,7 @@ def split_lot(
     db: Annotated[Session, Depends(get_db)],
 ) -> LotSplitResponse:
     """Split a lot into multiple child lots with full lineage tracking."""
-    result = batch_relations_service.split_lot(
-        db, principal, lot_id, payload.children
-    )
+    result = batch_relations_service.split_lot(db, principal, lot_id, payload.children)
     return LotSplitResponse(
         transaction_id=result["transaction_id"],
         parent_id=result["parent_id"],
