@@ -17,6 +17,9 @@ import type {
   Handover,
   HandoverPayload,
   OrganizationOption,
+  LotSplitRequest,
+  LotSplitResponse,
+  LotOriginTrace,
 } from '../types'
 
 
@@ -333,4 +336,19 @@ export const createEvent = (payload: CreateEventRequest) =>
 // ARCHITECTURAL GUARANTEE (N3-21):
 // There are NO updateEvent or deleteEvent functions.
 // Events are strictly append-only.
+
+export const splitLot = (lotId: string, payload: LotSplitRequest) =>
+  request<LotSplitResponse>(`/api/v1/lots/${lotId}/split`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+
+export const getLotChildren = (lotId: string) =>
+  request<Lot[]>(`/api/v1/lots/${lotId}/children`)
+
+export const getLotParents = (lotId: string) =>
+  request<Lot[]>(`/api/v1/lots/${lotId}/parents`)
+
+export const traceLotOrigin = (lotId: string) =>
+  request<LotOriginTrace>(`/api/v1/lots/${lotId}/lineage/origin`)
 

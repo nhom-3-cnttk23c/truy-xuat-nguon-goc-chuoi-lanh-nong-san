@@ -56,12 +56,17 @@ def _grant_existing_table_permissions(cursor, app_role: str) -> None:
             sql.SQL("REVOKE UPDATE, DELETE ON lots FROM {}").format(role_ident)
         )
         columns = _table_columns(cursor, "lots")
+        update_cols = []
         if {"current_holder_organization_id", "status"}.issubset(columns):
+            update_cols.extend(["current_holder_organization_id", "status"])
+        if "remaining_quantity" in columns:
+            update_cols.append("remaining_quantity")
+        if update_cols:
             cursor.execute(
-                sql.SQL(
-                    "GRANT UPDATE (current_holder_organization_id, status) "
-                    "ON lots TO {}"
-                ).format(role_ident)
+                sql.SQL("GRANT UPDATE ({}) ON lots TO {}").format(
+                    sql.SQL(", ").join(map(sql.Identifier, update_cols)),
+                    role_ident,
+                )
             )
     if "products" in tables:
         cursor.execute(
@@ -88,6 +93,23 @@ def _grant_existing_table_permissions(cursor, app_role: str) -> None:
                 "GRANT UPDATE (status, resolved_at, resolved_by_user_id, "
                 "rejection_reason) ON handovers TO {}"
             ).format(role_ident)
+        )
+    if "transactions" in tables:
+        cursor.execute(
+            sql.SQL("GRANT SELECT, INSERT ON transactions TO {}").format(role_ident)
+        )
+        cursor.execute(
+            sql.SQL("GRANT UPDATE (status, committed_at) ON transactions TO {}").format(
+                role_ident
+            )
+        )
+    if "batch_relations" in tables:
+        cursor.execute(
+            sql.SQL("GRANT SELECT, INSERT ON batch_relations TO {}").format(role_ident)
+        )
+    if "batch_events" in tables:
+        cursor.execute(
+            sql.SQL("GRANT SELECT, INSERT ON batch_events TO {}").format(role_ident)
         )
     cursor.execute(
         "SELECT routine_name FROM information_schema.routines WHERE routine_schema = 'public'"

@@ -64,6 +64,9 @@ export interface Lot {
   current_holder_organization_id: string
   current_holder_organization_name: string
   status: 'active' | 'pending_handover' | 'closed'
+  parent_batch_id: string | null
+  lineage_depth: number
+  root_harvest_id: string | null
   product: Product | null
 }
 
@@ -165,6 +168,52 @@ export interface CreateEventRequest {
   lot_id: string
   event_type: string
   payload?: Record<string, unknown>
+}
+
+export interface SplitChildPayload {
+  name: string
+  quantity: string
+}
+
+export interface LotSplitRequest {
+  children: SplitChildPayload[]
+  note?: string
+}
+
+export interface LotSplitResponse {
+  transaction_id: string
+  parent_id: string
+  children: Lot[]
+}
+
+export interface BatchRelation {
+  id: string
+  transaction_id: string
+  parent_batch_id: string
+  child_batch_id: string
+  weight_transferred: string
+  op_type: 'split' | 'merge'
+  created_at: string
+}
+
+export interface BatchEvent {
+  event_id: string
+  batch_id: string
+  event_type: string
+  payload: Record<string, unknown>
+  prev_hash: string
+  hash: string
+  actor_user_id: string
+  transaction_id: string
+  recorded_at: string
+}
+
+export interface LotOriginTrace {
+  root_harvest_id: string
+  root_harvest_name: string
+  root_harvest_lot_code: string | null
+  lineage_depth: number
+  is_ancestor_visible: boolean
 }
 
 export const ROLE_LABELS: Record<RoleCode, string> = {

@@ -10,12 +10,15 @@ from sqlalchemy.orm import Session
 from app.bootstrap_db_role import bootstrap_database_role
 from app.core.config import settings
 from app.core.security import hash_password, hash_session_token
+from app.models.batch_events import BatchEvent
+from app.models.batch_relations import BatchRelation
 from app.models.event import Event
 from app.models.farm import Farm
 from app.models.handover import Handover
 from app.models.identity import AuthSession, Organization, Role, User
 from app.models.integrity_check import IntegrityCheck
 from app.models.lot import Lot
+from app.models.transaction import Transaction
 
 
 @dataclass(frozen=True)
@@ -105,30 +108,82 @@ def identity_factory(
 
     yield create_identity
 
+    if created_organizations or created_users:
+        with admin_session.begin_nested():
+            admin_session.execute(text("ALTER TABLE events DISABLE TRIGGER USER"))
+            admin_session.execute(
+                text("ALTER TABLE integrity_checks DISABLE TRIGGER USER")
+            )
+            admin_session.execute(text("ALTER TABLE batch_events DISABLE TRIGGER USER"))
+
+            if created_organizations:
+                lot_ids = list(
+                    admin_session.scalars(
+                        select(Lot.id).where(
+                            Lot.organization_id.in_(created_organizations)
+                        )
+                    ).all()
+                )
+                if lot_ids:
+                    admin_session.execute(
+                        delete(Handover).where(Handover.lot_id.in_(lot_ids))
+                    )
+                    admin_session.execute(
+                        delete(IntegrityCheck).where(IntegrityCheck.lot_id.in_(lot_ids))
+                    )
+                    admin_session.execute(
+                        delete(Event).where(Event.lot_id.in_(lot_ids))
+                    )
+                    admin_session.execute(
+                        delete(BatchEvent).where(BatchEvent.batch_id.in_(lot_ids))
+                    )
+                    admin_session.execute(
+                        delete(BatchRelation).where(
+                            BatchRelation.parent_batch_id.in_(lot_ids)
+                            | BatchRelation.child_batch_id.in_(lot_ids)
+                        )
+                    )
+                    admin_session.execute(delete(Lot).where(Lot.id.in_(lot_ids)))
+
+            if created_users:
+                admin_session.execute(
+                    delete(BatchEvent).where(
+                        BatchEvent.actor_user_id.in_(created_users)
+                    )
+                )
+
+            tx_filter = []
+            if created_users:
+                tx_filter.append(Transaction.initiator_user_id.in_(created_users))
+            if created_organizations:
+                tx_filter.append(
+                    Transaction.initiator_organization_id.in_(created_organizations)
+                )
+
+            if tx_filter:
+                tx_cond = (
+                    tx_filter[0]
+                    if len(tx_filter) == 1
+                    else (tx_filter[0] | tx_filter[1])
+                )
+                tx_subq = select(Transaction.id).where(tx_cond)
+                admin_session.execute(
+                    delete(BatchEvent).where(BatchEvent.transaction_id.in_(tx_subq))
+                )
+                admin_session.execute(
+                    delete(BatchRelation).where(
+                        BatchRelation.transaction_id.in_(tx_subq)
+                    )
+                )
+                admin_session.execute(delete(Transaction).where(tx_cond))
+
+            admin_session.execute(text("ALTER TABLE batch_events ENABLE TRIGGER USER"))
+            admin_session.execute(
+                text("ALTER TABLE integrity_checks ENABLE TRIGGER USER")
+            )
+            admin_session.execute(text("ALTER TABLE events ENABLE TRIGGER USER"))
+
     if created_organizations:
-        lot_ids = list(
-            admin_session.scalars(
-                select(Lot.id).where(Lot.organization_id.in_(created_organizations))
-            ).all()
-        )
-        if lot_ids:
-            with admin_session.begin_nested():
-                admin_session.execute(text("ALTER TABLE events DISABLE TRIGGER USER"))
-                admin_session.execute(
-                    text("ALTER TABLE integrity_checks DISABLE TRIGGER USER")
-                )
-                admin_session.execute(
-                    delete(Handover).where(Handover.lot_id.in_(lot_ids))
-                )
-                admin_session.execute(
-                    delete(IntegrityCheck).where(IntegrityCheck.lot_id.in_(lot_ids))
-                )
-                admin_session.execute(delete(Event).where(Event.lot_id.in_(lot_ids)))
-                admin_session.execute(delete(Lot).where(Lot.id.in_(lot_ids)))
-                admin_session.execute(
-                    text("ALTER TABLE integrity_checks ENABLE TRIGGER USER")
-                )
-                admin_session.execute(text("ALTER TABLE events ENABLE TRIGGER USER"))
         admin_session.execute(
             delete(Farm).where(Farm.organization_id.in_(created_organizations))
         )

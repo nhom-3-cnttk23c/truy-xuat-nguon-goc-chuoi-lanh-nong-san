@@ -36,6 +36,10 @@ class Lot(Base):
             "status IN ('active', 'pending_handover', 'closed')",
             name="ck_lots_status_supported",
         ),
+        CheckConstraint(
+            "parent_batch_id IS NULL OR parent_batch_id <> id",
+            name="ck_lots_parent_not_self",
+        ),
         ForeignKeyConstraint(
             ["farm_id", "organization_id"],
             ["farms.id", "farms.organization_id"],
@@ -64,6 +68,8 @@ class Lot(Base):
             "lot_code",
             unique=True,
         ),
+        Index("ix_lots_parent_batch_id", "parent_batch_id"),
+        Index("ix_lots_root_harvest_id_depth", "root_harvest_id", "lineage_depth"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -104,6 +110,14 @@ class Lot(Base):
     status: Mapped[str] = mapped_column(
         String(24), nullable=False, default="active", server_default=text("'active'")
     )
+    parent_batch_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
+        ForeignKey("lots.id", name="fk_lots_parent_batch_id_lots", ondelete="RESTRICT"),
+    )
+    lineage_depth: Mapped[int] = mapped_column(
+        default=0, server_default=text("0"), nullable=False
+    )
+    root_harvest_id: Mapped[UUID | None] = mapped_column(PostgreSQLUUID(as_uuid=True))
     product: Mapped[Product | None] = relationship(lazy="joined")
     current_holder_organization: Mapped[Organization] = relationship(
         foreign_keys=[current_holder_organization_id], lazy="joined"
