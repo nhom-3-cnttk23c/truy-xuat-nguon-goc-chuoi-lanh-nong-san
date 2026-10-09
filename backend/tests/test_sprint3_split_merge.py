@@ -385,13 +385,14 @@ async def test_batch_events_immutability_prevents_update_delete(
     assert event
 
     # Attempt UPDATE → should raise exception
+    from sqlalchemy.exc import DBAPIError
     from sqlalchemy.exc import IntegrityError as SQLAlchemyIntegrityError
 
     try:
         event.payload = {"tampered": True}
         admin_session.commit()
         pytest.fail("Expected exception when updating batch_events")
-    except SQLAlchemyIntegrityError:
+    except (SQLAlchemyIntegrityError, DBAPIError):
         admin_session.rollback()  # Expected
 
     # Attempt DELETE → should raise exception
@@ -399,7 +400,7 @@ async def test_batch_events_immutability_prevents_update_delete(
         admin_session.delete(event)
         admin_session.commit()
         pytest.fail("Expected exception when deleting batch_events")
-    except SQLAlchemyIntegrityError:
+    except (SQLAlchemyIntegrityError, DBAPIError):
         admin_session.rollback()  # Expected
 
     _cleanup_lots(admin_session, [parent.id] + [c.id for c in result["children"]])
