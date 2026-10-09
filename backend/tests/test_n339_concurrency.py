@@ -13,6 +13,7 @@ from app.models.batch_events import BatchEvent
 from app.models.batch_relations import BatchRelation
 from app.models.farm import Farm
 from app.models.lot import Lot
+from app.schemas.batch_split import SplitChildPayload
 from app.services import batch_relations_service
 from tests.conftest import IdentityFixture
 
@@ -89,10 +90,10 @@ def test_concurrent_split_same_parent_first_wins_second_rolled_back(
     
     # Simulate two concurrent split attempts that both exceed mass
     children_payload_1 = [
-        type('Child', (), {'name': 'C1a', 'quantity': Decimal("60")})(),
+        SplitChildPayload(name="C1a", quantity=Decimal("60")),
     ]
     children_payload_2 = [
-        type('Child', (), {'name': 'C2a', 'quantity': Decimal("50")})(),
+        SplitChildPayload(name="C2a", quantity=Decimal("50")),
     ]
     
     # First split: succeed
@@ -147,7 +148,7 @@ def test_pessimistic_lock_prevents_concurrent_modification(
         admin_session,
         principal,
         parent.id,
-        [type('Child', (), {'name': 'C1', 'quantity': Decimal("50")})()],
+        [SplitChildPayload(name="C1", quantity=Decimal("50"))],
     )
     
     # Verify pessimistic lock was applied (check via pg_locks would require direct SQL)

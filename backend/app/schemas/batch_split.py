@@ -18,6 +18,28 @@ class LotSplitRequest(BaseModel):
     note: str | None = Field(None, max_length=500)
 
 
+class LotSplitResponse(BaseModel):
+    """Response after splitting a lot."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    transaction_id: UUID
+    parent_id: UUID
+    children: list["LotRead"]  # Forward ref to avoid circular import
+
+
+class LotOriginTrace(BaseModel):
+    """Response when tracing lot to root harvest."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    root_harvest_id: UUID
+    root_harvest_name: str
+    root_harvest_lot_code: str | None
+    lineage_depth: int
+    is_ancestor_visible: bool
+
+
 class BatchRelationRead(BaseModel):
     """Read schema for a batch relation (DAG edge)."""
 
@@ -46,3 +68,7 @@ class BatchEventRead(BaseModel):
     actor_user_id: UUID
     transaction_id: UUID
     recorded_at: str
+
+
+# Import at end to avoid circular reference
+from app.schemas.lot import LotRead  # noqa: E402, F401

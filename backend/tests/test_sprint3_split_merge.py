@@ -17,6 +17,7 @@ from app.models.farm import Farm
 from app.models.lot import Lot
 from app.models.product import Product
 from app.models.transaction import Transaction
+from app.schemas.batch_split import SplitChildPayload
 from app.services import batch_relations_service
 from tests.conftest import IdentityFixture
 
@@ -59,7 +60,7 @@ def _make_principal(identity: IdentityFixture) -> Principal:
 
 
 def _cleanup_lots(db: Session, lot_ids: list) -> None:
-    """Delete lots and cascade cascade events/relations."""
+    """Delete lots and cascade relations/events."""
     if not lot_ids:
         return
     with db.begin_nested():
@@ -107,18 +108,9 @@ async def test_split_lot_happy_path_creates_children_and_events(
     
     # Split into 3 children: 50 + 30 + 10 = 90 kg (remainder 10 kg)
     children_payload = [
-        type('Child', (), {
-            'name': f'Child-50kg',
-            'quantity': Decimal("50"),
-        })(),
-        type('Child', (), {
-            'name': f'Child-30kg',
-            'quantity': Decimal("30"),
-        })(),
-        type('Child', (), {
-            'name': f'Child-10kg',
-            'quantity': Decimal("10"),
-        })(),
+        SplitChildPayload(name="Child-50kg", quantity=Decimal("50")),
+        SplitChildPayload(name="Child-30kg", quantity=Decimal("30")),
+        SplitChildPayload(name="Child-10kg", quantity=Decimal("10")),
     ]
     
     result = batch_relations_service.split_lot(
@@ -200,8 +192,8 @@ async def test_split_lot_rejects_mass_conservation_violation(
     
     # Attempt split: 60 + 50 = 110 > 100 (violation)
     children_payload = [
-        type('Child', (), {'name': 'C1', 'quantity': Decimal("60")})(),
-        type('Child', (), {'name': 'C2', 'quantity': Decimal("50")})(),
+        SplitChildPayload(name="C1", quantity=Decimal("60")),
+        SplitChildPayload(name="C2", quantity=Decimal("50")),
     ]
     
     from fastapi import HTTPException
@@ -291,7 +283,7 @@ async def test_trace_lot_origin_to_root_harvest(admin_session: Session, identity
     
     # Split root into child
     children_payload = [
-        type('Child', (), {'name': 'Child-50', 'quantity': Decimal("50")})(),
+        SplitChildPayload(name="Child-50", quantity=Decimal("50")),
     ]
     result = batch_relations_service.split_lot(
         admin_session, principal, root.id, children_payload
@@ -336,8 +328,8 @@ async def test_get_batch_children_returns_direct_children_only(
     
     # Split parent → 2 children
     children_payload = [
-        type('Child', (), {'name': 'C1', 'quantity': Decimal("50")})(),
-        type('Child', (), {'name': 'C2', 'quantity': '50'})(),
+        SplitChildPayload(name="C1", quantity=Decimal("50")),
+        SplitChildPayload(name="C2", quantity=Decimal("50")),
     ]
     result1 = batch_relations_service.split_lot(
         admin_session, principal, parent.id, children_payload
@@ -380,7 +372,7 @@ async def test_batch_events_immutability_prevents_update_delete(
     principal = _make_principal(owner)
     
     children_payload = [
-        type('Child', (), {'name': 'C1', 'quantity': Decimal("100")})(),
+        SplitChildPayload(name="C1", quantity=Decimal("100")),
     ]
     result = batch_relations_service.split_lot(
         admin_session, principal, parent.id, children_payload

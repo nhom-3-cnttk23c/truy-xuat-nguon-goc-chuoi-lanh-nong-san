@@ -29,18 +29,15 @@ def split_lot(
     
     Ensures:
     1. Parent lot is accessible and current_holder is caller's org
-    2. Σ(child quantities) + remainder ≤ parent remaining_quantity
+    2. Σ(child quantities) ≤ parent remaining_quantity
     3. Pessimistic lock on parent + advisory lock for race prevention
     4. All children created in single transaction
-    5. All events (split_occurred + created_from_split) appended with hash chain
+    5. All events (split_initiated + created_from_split) appended with hash chain
     6. lineage_depth and root_harvest_id pre-computed for fast queries
     
     Returns:
-        dict with 'transaction_id', 'parent_id', 'children' (list of created Lot objects)
+        Dict with 'transaction_id', 'parent_id', and 'children' (list of created Lot objects)
     """
-    # ========================================================================
-    # 1. Verify parent lot accessibility and holder
-    # ========================================================================
     parent = get_tenant_record(db, Lot, parent_id, principal)
     
     if parent.current_holder_organization_id != principal.organization_id:
@@ -49,33 +46,25 @@ def split_lot(
             detail="Chỉ tổ chức hiện giữ lô mới có thể tách lô.",
         )
 
-    # ========================================================================
-    # 2. Acquire pessimistic lock on parent + advisory lock
-    # ========================================================================
+    # Pessimistic lock: block concurrent modifications
     db.execute(
         select(Lot)
         .where(Lot.id == parent_id)
         .with_for_update(nowait=False)
     )
     
-    # Advisory lock for extra race prevention (org+parent_id based)
     lock_id = hash(f"split:{principal.organization_id}:{parent_id}") % (2**31)
     db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
 
-    # ========================================================================
-    # 3. Validate mass conservation
-    # ========================================================================
     total_children_qty = sum(child.quantity for child in children_payload)
     
     if total_children_qty > parent.remaining_quantity:
+        unit = parent.product.unit if parent.product else "kg"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Tổng khối lượng lô con ({total_children_qty} {parent.product.unit if parent.product else 'kg'}) vượt khối lượng còn lại của lô mẹ ({parent.remaining_quantity}).",
+            detail=f"Tổng khối lượng lô con ({total_children_qty} {unit}) vượt khối lượng còn lại ({parent.remaining_quantity}).",
         )
 
-    # ========================================================================
-    # 4. Create transaction record
-    # ========================================================================
     transaction = Transaction(
         initiator_user_id=principal.user_id,
         initiator_organization_id=principal.organization_id,
@@ -85,15 +74,10 @@ def split_lot(
     db.add(transaction)
     db.flush()
 
-    # ========================================================================
-    # 5. Create child lots with lineage info
-    # ========================================================================
     created_children: list[Lot] = []
-    remainder_qty = parent.remaining_quantity - total_children_qty
 
     for child_payload in children_payload:
-        # Retry lot_code collision (same pattern as harvest_lot)
-        for _ in range(5):
+        for attempt in range(5):
             lot_code = generate_lot_code()
             child = Lot(
                 organization_id=principal.organization_id,
@@ -108,7 +92,7 @@ def split_lot(
                 status="active",
                 parent_batch_id=parent_id,
                 lineage_depth=parent.lineage_depth + 1,
-                root_harvest_id=parent.root_harvest_id or parent_id,  # Propagate or set self
+                root_harvest_id=parent.root_harvest_id or parent_id,
             )
             try:
                 with db.begin_nested():
@@ -117,15 +101,12 @@ def split_lot(
                 created_children.append(child)
                 break
             except Exception:
-                if _ < 4:
+                if attempt < 4:
                     continue
                 raise
 
     db.refresh(parent)
 
-    # ========================================================================
-    # 6. Create batch_relations edges for each child
-    # ========================================================================
     for child in created_children:
         relation = BatchRelation(
             transaction_id=transaction.id,
@@ -136,79 +117,52 @@ def split_lot(
         )
         db.add(relation)
 
-    # ========================================================================
-    # 7. Append immutable events to batch_events table
-    # ========================================================================
-    
-    # Event 1: split_initiated on parent
-    parent_split_content = {
-        "event_type": "split_initiated",
-        "batch_id": str(parent_id),
-        "organization_id": str(principal.organization_id),
-        "payload": {
-            "num_children": len(created_children),
-            "total_transferred": str(total_children_qty),
-            "remainder": str(remainder_qty),
-        },
-        "sequence": 1,  # Simplified; real impl would query max sequence per lot
+    # Create immutable events
+    parent_payload = {
+        "num_children": len(created_children),
+        "total_transferred": str(total_children_qty),
+        "remainder": str(parent.remaining_quantity - total_children_qty),
     }
-    parent_split_hash = compute_event_hash(GENESIS_PREV_HASH, parent_split_content)
+    parent_hash = compute_event_hash(GENESIS_PREV_HASH, parent_payload)
     
-    parent_event = BatchEvent(
-        batch_id=parent_id,
-        event_type="split_initiated",
-        payload={
-            "num_children": len(created_children),
-            "total_transferred": str(total_children_qty),
-            "remainder": str(remainder_qty),
-        },
-        prev_hash=GENESIS_PREV_HASH,
-        hash=parent_split_hash,
-        actor_user_id=principal.user_id,
-        transaction_id=transaction.id,
-    )
-    db.add(parent_event)
-    db.flush()
-
-    # Event 2: created_from_split for each child
-    for i, child in enumerate(created_children):
-        child_created_content = {
-            "event_type": "created_from_split",
-            "batch_id": str(child.id),
-            "organization_id": str(principal.organization_id),
-            "payload": {
-                "parent_batch_id": str(parent_id),
-                "quantity": str(child.remaining_quantity),
-                "name": child.name,
-                "lot_code": child.lot_code,
-            },
-            "sequence": i + 1,
-        }
-        child_created_hash = compute_event_hash(GENESIS_PREV_HASH, child_created_content)
-        
-        child_event = BatchEvent(
-            batch_id=child.id,
-            event_type="created_from_split",
-            payload={
-                "parent_batch_id": str(parent_id),
-                "quantity": str(child.remaining_quantity),
-                "name": child.name,
-                "lot_code": child.lot_code,
-            },
+    db.add(
+        BatchEvent(
+            batch_id=parent_id,
+            event_type="split_initiated",
+            payload=parent_payload,
             prev_hash=GENESIS_PREV_HASH,
-            hash=child_created_hash,
+            hash=parent_hash,
             actor_user_id=principal.user_id,
             transaction_id=transaction.id,
         )
-        db.add(child_event)
-
-    # ========================================================================
-    # 8. Commit transaction and update parent status
-    # ========================================================================
-    transaction.status = "committed"
+    )
     db.flush()
 
+    for child in created_children:
+        child_payload_dict = {
+            "parent_batch_id": str(parent_id),
+            "quantity": str(child.remaining_quantity),
+            "name": child.name,
+            "lot_code": child.lot_code,
+        }
+        child_hash = compute_event_hash(GENESIS_PREV_HASH, child_payload_dict)
+        
+        db.add(
+            BatchEvent(
+                batch_id=child.id,
+                event_type="created_from_split",
+                payload=child_payload_dict,
+                prev_hash=GENESIS_PREV_HASH,
+                hash=child_hash,
+                actor_user_id=principal.user_id,
+                transaction_id=transaction.id,
+            )
+        )
+
+    transaction.status = "committed"
+    db.flush()
     db.commit()
+    
     db.refresh(transaction)
     for child in created_children:
         db.refresh(child)
@@ -226,9 +180,9 @@ def get_batch_children(
     parent_id: UUID,
 ) -> list[Lot]:
     """Get direct children (1 level) of a parent lot via batch_relations."""
-    parent = get_tenant_record(db, Lot, parent_id, principal)
+    get_tenant_record(db, Lot, parent_id, principal)  # Verify access
     
-    children = db.scalars(
+    return db.scalars(
         select(Lot)
         .join(
             BatchRelation,
@@ -238,10 +192,8 @@ def get_batch_children(
             BatchRelation.parent_batch_id == parent_id,
             BatchRelation.op_type == "split",
         )
-        .order_by(Lot.created_at.asc() if hasattr(Lot, 'created_at') else Lot.id.asc())
+        .order_by(Lot.id.asc())
     ).all()
-    
-    return list(children)
 
 
 def get_batch_parents(
