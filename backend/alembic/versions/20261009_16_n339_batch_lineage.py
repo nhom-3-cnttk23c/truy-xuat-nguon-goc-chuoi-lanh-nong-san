@@ -322,6 +322,27 @@ def upgrade() -> None:
         )
         """
     )
+    op.execute(
+        """
+        CREATE POLICY transactions_insert_tenant ON transactions
+        FOR INSERT
+        WITH CHECK (
+            initiator_organization_id = public.app_current_organization_id()
+        )
+        """
+    )
+    op.execute(
+        """
+        CREATE POLICY transactions_update_tenant ON transactions
+        FOR UPDATE
+        USING (
+            initiator_organization_id = public.app_current_organization_id()
+        )
+        WITH CHECK (
+            initiator_organization_id = public.app_current_organization_id()
+        )
+        """
+    )
 
     # batch_relations: visible through lineage (parent org, child org, or auditors)
     op.execute(
@@ -343,6 +364,22 @@ def upgrade() -> None:
         )
         """
     )
+    op.execute(
+        """
+        CREATE POLICY batch_relations_insert_tenant ON batch_relations
+        FOR INSERT
+        WITH CHECK (
+            EXISTS (
+                SELECT 1 FROM lots l
+                WHERE l.id = batch_relations.parent_batch_id
+                AND (
+                    l.organization_id = public.app_current_organization_id()
+                    OR l.current_holder_organization_id = public.app_current_organization_id()
+                )
+            )
+        )
+        """
+    )
 
     # batch_events: visible through lot lineage + event_type visibility
     op.execute(
@@ -359,6 +396,22 @@ def upgrade() -> None:
         )
         """
     )
+    op.execute(
+        """
+        CREATE POLICY batch_events_insert_tenant ON batch_events
+        FOR INSERT
+        WITH CHECK (
+            EXISTS (
+                SELECT 1 FROM lots l
+                WHERE l.id = batch_events.batch_id
+                AND (
+                    l.organization_id = public.app_current_organization_id()
+                    OR l.current_holder_organization_id = public.app_current_organization_id()
+                )
+            )
+        )
+        """
+    )
 
     # Grant permissions to application role
     role = _application_role()
@@ -367,11 +420,13 @@ def upgrade() -> None:
         op.execute(f"GRANT UPDATE (status, committed_at) ON transactions TO {role}")
         op.execute(f"GRANT SELECT, INSERT ON batch_relations TO {role}")
         op.execute(f"GRANT SELECT, INSERT ON batch_events TO {role}")
+        op.execute(f"GRANT UPDATE (remaining_quantity) ON lots TO {role}")
 
 
 def downgrade() -> None:
     role = _application_role()
     if role:
+        op.execute(f"REVOKE UPDATE (remaining_quantity) ON lots FROM {role}")
         op.execute(f"REVOKE SELECT, INSERT ON batch_events FROM {role}")
         op.execute(f"REVOKE SELECT, INSERT ON batch_relations FROM {role}")
         op.execute(f"REVOKE UPDATE (status, committed_at) ON transactions FROM {role}")
@@ -379,14 +434,18 @@ def downgrade() -> None:
 
     op.execute("ALTER TABLE batch_events NO FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE batch_events DISABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS batch_events_insert_tenant ON batch_events")
     op.execute("DROP POLICY IF EXISTS batch_events_read_lineage ON batch_events")
 
     op.execute("ALTER TABLE batch_relations NO FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE batch_relations DISABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS batch_relations_insert_tenant ON batch_relations")
     op.execute("DROP POLICY IF EXISTS batch_relations_read_lineage ON batch_relations")
 
     op.execute("ALTER TABLE transactions NO FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE transactions DISABLE ROW LEVEL SECURITY")
+    op.execute("DROP POLICY IF EXISTS transactions_update_tenant ON transactions")
+    op.execute("DROP POLICY IF EXISTS transactions_insert_tenant ON transactions")
     op.execute(
         "DROP POLICY IF EXISTS transactions_read_tenant_or_auditor ON transactions"
     )

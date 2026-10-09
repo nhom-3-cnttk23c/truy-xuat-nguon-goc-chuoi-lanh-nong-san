@@ -102,7 +102,9 @@ def split_lot(
                     continue
                 raise
 
-    db.refresh(parent)
+    remainder = parent.remaining_quantity - total_children_qty
+    parent.remaining_quantity = remainder
+    db.flush()
 
     for child in created_children:
         relation = BatchRelation(
@@ -118,7 +120,7 @@ def split_lot(
     parent_payload = {
         "num_children": len(created_children),
         "total_transferred": str(total_children_qty),
-        "remainder": str(parent.remaining_quantity - total_children_qty),
+        "remainder": str(remainder),
     }
     parent_hash = compute_event_hash(GENESIS_PREV_HASH, parent_payload)
 
@@ -161,6 +163,7 @@ def split_lot(
     db.commit()
 
     db.refresh(transaction)
+    db.refresh(parent)
     for child in created_children:
         db.refresh(child)
 
