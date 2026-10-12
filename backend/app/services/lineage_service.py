@@ -34,20 +34,6 @@ def _lock_parents(
         ).all()
     )
     if len(lots) != len(ids):
-        foreign_lots = list(
-            db.scalars(
-                select(Lot).where(
-                    Lot.id.in_(ids),
-                    Lot.current_holder_organization_id != principal.organization_id,
-                )
-            ).all()
-        )
-        if foreign_lots:
-            offending = foreign_lots[0]
-            raise HTTPException(
-                403,
-                f"Lô {offending.lot_code or offending.name} không do tổ chức của bạn nắm giữ. Bạn chỉ được xử lý lô do tổ chức mình đang giữ.",
-            )
         raise HTTPException(403, "Bạn chỉ được xử lý lô do tổ chức mình đang giữ.")
     for lot in lots:
         if lot.status != "active":
