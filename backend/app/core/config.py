@@ -60,6 +60,17 @@ class Settings(BaseSettings):
             raise ValueError("DB_USER and DB_ADMIN_USER must be different")
         return self
 
+    def validate_runtime(self, *, migrate: bool = False) -> None:
+        """Fail before serving traffic, without including credential values."""
+        if not self.DATABASE_URL.password:
+            raise ValueError("Thiếu DB_PASSWORD hoặc DATABASE_URL_ENV có mật khẩu")
+        if self.DATABASE_URL.username == self.DB_ADMIN_USER:
+            raise ValueError(
+                "DATABASE_URL_ENV phải dùng DB_USER, không dùng DB_ADMIN_USER"
+            )
+        if migrate and not self.MIGRATION_DATABASE_URL.password:
+            raise ValueError("Thiếu DB_ADMIN_PASSWORD hoặc MIGRATION_DATABASE_URL_ENV")
+
     @property
     def DATABASE_URL(self) -> URL:
         if self.DATABASE_URL_ENV:

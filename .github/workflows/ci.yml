@@ -2,7 +2,6 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -98,7 +97,19 @@ jobs:
       - name: Run backend integration tests (Pytest)
         run: |
           cd backend
-          pytest tests/ -v
+          pytest tests/ -v -m "not performance" --cov=app --cov-report=xml --cov-report=json
+          pytest tests/ -v -m performance
+
+      - name: Audit backend dependencies
+        run: cd backend && pip-audit
+
+      - name: Save coverage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage.xml
+            backend/coverage.json
 
   frontend-check:
     name: ⚛️ Frontend (Lint & Build)
@@ -124,6 +135,9 @@ jobs:
           cd frontend
           npm run lint
 
+      - name: Audit frontend dependencies
+        run: cd frontend && npm audit
+
       - name: Build production bundle
         run: |
           cd frontend
@@ -142,7 +156,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build backend image
-        run: docker build -t ttcs-backend:ci ./backend
+        run: docker build --build-arg COMMIT_SHA=${{ github.sha }} -t ttcs-backend:${{ github.sha }} ./backend
 
       - name: Build frontend image
-        run: docker build -t ttcs-frontend:ci ./frontend
+        run: docker build --build-arg COMMIT_SHA=${{ github.sha }} -t ttcs-frontend:${{ github.sha }} ./frontend

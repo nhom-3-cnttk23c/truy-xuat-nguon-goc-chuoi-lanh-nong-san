@@ -58,6 +58,23 @@ def test_production_is_the_default_environment_and_debug_is_off(monkeypatch):
     assert settings.DEBUG is False
 
 
+def test_runtime_rejects_missing_credentials_without_values():
+    settings = Settings(_env_file=None, DB_PASSWORD="", DATABASE_URL_ENV=None)
+    with pytest.raises(ValueError, match="DB_PASSWORD"):
+        settings.validate_runtime()
+
+
+def test_runtime_rejects_admin_url():
+    settings = Settings(
+        _env_file=None,
+        DB_PASSWORD="",
+        DB_ADMIN_USER="admin",
+        DATABASE_URL_ENV="postgresql://admin:secret@localhost/db",
+    )
+    with pytest.raises(ValueError, match="DB_USER"):
+        settings.validate_runtime()
+
+
 def test_cors_rejects_wildcard_origin_with_cookie_authentication():
     with pytest.raises(ValidationError, match="wildcard origin"):
         Settings(_env_file=None, ALLOWED_ORIGINS="https://app.example,*")

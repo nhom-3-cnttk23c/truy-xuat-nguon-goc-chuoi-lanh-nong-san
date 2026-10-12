@@ -1,0 +1,15 @@
+name: Staging hourly maintenance
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wake-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake staging and check database readiness
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 15 --retry-all-errors --max-time 45 https://ttcs-backend-staging.onrender.com/health

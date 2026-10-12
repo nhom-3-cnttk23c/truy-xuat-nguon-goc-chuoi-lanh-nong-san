@@ -37,16 +37,18 @@ def _runtime_environment(
 
 
 def main() -> None:
+    settings.validate_runtime(migrate=True)
     try:
         bootstrap_database_role()
-    except Exception as exc:
-        logger.warning("Database role bootstrap skipped or failed: %s", exc)
+    except Exception:
+        logger.critical("Database role bootstrap failed; startup stopped.")
+        raise SystemExit(1) from None
 
     try:
         run_migrations()
-    except Exception as exc:
-        logger.critical("Database migration failed: %s", exc, exc_info=True)
-        raise
+    except Exception:
+        logger.critical("Database migration failed; startup stopped.")
+        raise SystemExit(1) from None
 
     seed_demo_data()
 

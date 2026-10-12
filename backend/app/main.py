@@ -1,16 +1,42 @@
+import asyncio
+import os
+import re
+import time
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.endpoints import auth
 from app.api.v1.router import api_router
 from app.core.audit import AuditMiddleware
 from app.core.config import settings
+from app.core.database import engine
+from app.jobs import scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings.validate_runtime()
+    app.state.maintenance_started = True
+    task = asyncio.create_task(scheduler.run_hourly())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        app.state.maintenance_started = False
+
 
 app = FastAPI(
     title="Cold Chain Traceability API",
     description="API hệ thống truy xuất nguồn gốc và giám sát chuỗi lạnh nông sản",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -114,6 +140,27 @@ def health_check(request: Request):
     if "text/html" in accept and "application/json" not in accept:
         return HTMLResponse(content=HTML_LANDING)
     return {"status": "ok", "message": "Backend service is online"}
+
+
+@app.get("/health", tags=["health"])
+def readiness():
+    if getattr(app.state, "maintenance_started", False) and (
+        scheduler.last_success is None
+        or time.monotonic() - scheduler.last_success > 7200
+    ):
+        return JSONResponse(status_code=503, content={"status": "unavailable"})
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return JSONResponse(status_code=503, content={"status": "unavailable"})
+    return {"status": "ok"}
+
+
+@app.get("/version", tags=["health"])
+def release_version():
+    commit = os.getenv("RENDER_GIT_COMMIT") or os.getenv("APP_COMMIT_SHA", "")
+    return {"commit": commit if re.fullmatch(r"[a-fA-F0-9]{40}", commit) else None}
 
 
 @app.exception_handler(404)

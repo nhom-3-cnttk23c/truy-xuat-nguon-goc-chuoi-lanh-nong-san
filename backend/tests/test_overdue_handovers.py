@@ -3,7 +3,8 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.core.auth import Principal
@@ -19,6 +20,32 @@ from tests.lineage_helpers import add_lot, client, login
 
 lineage = fixtures.lineage
 lineage_products = fixtures.lineage_products
+
+
+def test_runtime_maintenance_marks_only_expired_pending(overdue_case, admin_session):
+    from app.jobs.scheduler import mark_overdue
+
+    _, _, create = overdue_case
+    old = create(created_at=datetime.now(UTC) - timedelta(hours=49))
+    fresh = create(created_at=datetime.now(UTC) - timedelta(hours=1))
+    resolved = create(
+        created_at=datetime.now(UTC) - timedelta(hours=72), status="rejected"
+    )
+    assert mark_overdue() >= 1
+    assert mark_overdue() == 0
+    admin_session.expire_all()
+    assert old.overdue_at is not None and old.status == "pending"
+    assert fresh.overdue_at is None
+    assert resolved.overdue_at is None
+    with SessionLocal() as runtime:
+        with pytest.raises(DBAPIError):
+            runtime.execute(text("SELECT public.app_mark_overdue_handovers(0)"))
+        runtime.rollback()
+        assert not runtime.scalar(
+            text(
+                "SELECT has_function_privilege('public','public.app_mark_overdue_handovers(integer)','EXECUTE')"
+            )
+        )
 
 
 @pytest.fixture

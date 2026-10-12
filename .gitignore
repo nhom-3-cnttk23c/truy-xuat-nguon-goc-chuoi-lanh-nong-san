@@ -12,6 +12,9 @@ local_docs/
 backend/.venv/
 backend/venv/
 backend/.pytest_cache/
+backend/.coverage*
+backend/coverage.json
+backend/coverage.xml
 backend/*.egg-info/
 
 # Node / Frontend

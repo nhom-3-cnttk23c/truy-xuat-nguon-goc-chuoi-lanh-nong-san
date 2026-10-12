@@ -28,7 +28,7 @@ jobs:
           fi
 
   verify-staging:
-    name: Verify Sprint 2 API on staging
+    name: Verify current release and Sprint 1–4 API on staging
     needs: deploy-staging
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -37,6 +37,7 @@ jobs:
       - name: Wait for Sprint 2 API routes to be deployed
         env:
           OPENAPI_URL: https://ttcs-backend-staging.onrender.com/openapi.json
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           python - <<'PY'
           import json
@@ -57,6 +58,15 @@ jobs:
               "/api/v1/handovers/": {"post"},
               "/api/v1/handovers/{handover_id}/accept": {"post"},
               "/api/v1/handovers/{handover_id}/reject": {"post"},
+              "/api/v1/lots/{lot_id}/split": {"post"},
+              "/api/v1/lots/merge": {"post"},
+              "/api/v1/lots/{lot_id}/lineage": {"get"},
+              "/api/v1/lots/{lot_id}/consume": {"post"},
+              "/api/v1/locations/": {"get", "post"},
+              "/api/v1/imports/{kind}": {"post"},
+              "/api/v1/audit/": {"get"},
+              "/health": {"get"},
+              "/version": {"get"},
           }
           url = os.environ["OPENAPI_URL"]
           last_error = "OpenAPI has not been checked yet"
@@ -66,13 +76,21 @@ jobs:
                   with urlopen(url, timeout=10) as response:
                       document = json.load(response)
                   paths = document.get("paths", {})
+                  base_url = url.removesuffix("/openapi.json")
+                  with urlopen(base_url + "/health", timeout=10) as response:
+                      if json.load(response).get("status") != "ok":
+                          raise RuntimeError("Database or maintenance is not ready")
+                  with urlopen(base_url + "/version", timeout=10) as response:
+                      commit = json.load(response).get("commit")
+                  if commit != os.environ["EXPECTED_COMMIT"]:
+                      raise RuntimeError("Staging still serves a different commit")
                   missing = [
                       f"{path} [{', '.join(sorted(methods - set(paths.get(path, {}))))}]"
                       for path, methods in expected.items()
                       if not methods.issubset(set(paths.get(path, {})))
                   ]
                   if not missing:
-                      print(f"Staging OpenAPI exposes all {len(expected)} Sprint 2 route contracts.")
+                      print(f"Verified release {commit}: database ready and all {len(expected)} route contracts present.")
                       sys.exit(0)
                   last_error = "Missing route methods: " + "; ".join(missing)
               except Exception as error:

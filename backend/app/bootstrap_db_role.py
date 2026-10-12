@@ -141,6 +141,13 @@ def _grant_existing_table_permissions(cursor, app_role: str) -> None:
             ).format(role_ident)
         )
 
+    if "app_mark_overdue_handovers" in routines:
+        cursor.execute(
+            sql.SQL(
+                "GRANT EXECUTE ON FUNCTION public.app_mark_overdue_handovers(integer) TO {}"
+            ).format(role_ident)
+        )
+
 
 def bootstrap_database_role() -> None:
     app_url = settings.DATABASE_URL
