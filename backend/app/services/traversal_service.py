@@ -5,12 +5,13 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import func, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased, contains_eager
 
 from app.core.auth import Principal
 from app.core.tenancy import get_tenant_record, lot_is_historical
 from app.models.event import Event
 from app.models.farm import Farm
+from app.models.identity import Organization
 from app.models.lot import Lot
 from app.models.lot_relation import LotRelation
 from app.schemas.lot import LotRead
@@ -105,9 +106,17 @@ def get_lineage(
     for edge in edges:
         ids.update((edge.parent_lot_id, edge.child_lot_id))
     roots = _roots_and_check_cycle(db, ids, edges)
+    # Evaluate organization RLS once, rather than once per node when the
+    # planner chooses a nested-loop join. The CTE uses the caller's RLS context.
+    visible_organizations = (
+        select(Organization).cte("lineage_organizations").prefix_with("MATERIALIZED")
+    )
+    organization = aliased(Organization, visible_organizations)
     rows = db.execute(
         select(Lot, Farm, lot_is_historical(Lot, principal))
         .outerjoin(Farm, Farm.id == Lot.farm_id)
+        .outerjoin(organization, Lot.current_holder_organization_id == organization.id)
+        .options(contains_eager(Lot.current_holder_organization, alias=organization))
         .where(Lot.id.in_(ids))
         .order_by(Lot.id)
     ).all()

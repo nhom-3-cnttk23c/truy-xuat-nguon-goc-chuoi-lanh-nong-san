@@ -9,7 +9,7 @@ from app.core.auth import Principal
 from app.core.database import SessionLocal, set_db_context
 from app.models.lot import Lot
 from app.models.lot_relation import LotRelation
-from app.services.traversal_service import get_detail
+from app.services.traversal_service import get_detail, get_lineage
 from tests import test_sprint3_lineage as fixtures
 from tests.lineage_helpers import add_lot, client, login, split_body
 
@@ -237,6 +237,51 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
             assert len(result.json()["nodes"]) == 1000
             assert len(result.json()["edges"]) == 999
             assert elapsed < 2, f"{direction}: {elapsed:.3f}s"
+
+    # Independently reproduce the nested-loop plan that repeats organization
+    # authorization per node. Run after the API timings to avoid warming them.
+    principal = Principal(
+        owner.user_id,
+        owner.email,
+        "Test",
+        owner.organization_id,
+        "Test",
+        "cooperative",
+        "cooperative",
+    )
+    with SessionLocal() as db:
+        set_db_context(db, session_token_hash=owner.session_token_hash)
+        connection = db.connection()
+        connection.execute(text("SET LOCAL enable_hashjoin = off"))
+        connection.execute(text("SET LOCAL enable_mergejoin = off"))
+        connection.execute(text("SET LOCAL enable_material = off"))
+        captured = []
+
+        def capture(conn, cur, statement, parameters, context, many):
+            captured.append((statement, parameters))
+
+        event.listen(connection, "before_cursor_execute", capture)
+        try:
+            get_lineage(db, principal, root.id, "descendants")
+        finally:
+            event.remove(connection, "before_cursor_execute", capture)
+        sql, parameters = captured[-1]
+        plan = connection.exec_driver_sql(
+            "EXPLAIN (ANALYZE, FORMAT JSON) " + sql, parameters
+        ).scalar()[0]["Plan"]
+
+        def plan_nodes(node):
+            yield node
+            for child in node.get("Plans", []):
+                yield from plan_nodes(child)
+
+        organization_scans = [
+            node
+            for node in plan_nodes(plan)
+            if node.get("Relation Name") == "organizations"
+        ]
+        assert organization_scans
+        assert all(node["Actual Loops"] <= 1 for node in organization_scans)
 
 
 def test_detail_uses_three_queries_with_runtime_role(lineage, admin_session):
