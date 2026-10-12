@@ -431,3 +431,168 @@ async def test_n340_successive_splits_mass_conservation_exact_to_gram(
     # Tổng mọi lô con = đúng 40.000 kg, không lệch một gram
     assert sum(all_children_quantities) == Decimal("40.000")
     assert_mass(admin_session, parent.id, "0.000", "closed")
+
+
+@pytest.mark.asyncio
+async def test_n341_merge_three_parents_all_mass_creates_single_child_and_closes_all_parents(
+    lineage, admin_session
+):
+    """N3-41 AC1: Giữ ba lô cùng sản phẩm, gộp toàn bộ -> một lô mới ghi rõ cả ba lô mẹ, ba lô mẹ còn lại 0 kg (closed)."""
+    owner, products, _ = lineage
+    parents = [add_lot(admin_session, owner, products[0]) for _ in range(3)]
+    async with client() as api:
+        await login(api, owner)
+        response = await api.post(
+            "/api/v1/lots/merge",
+            json=merge_body(
+                (parents[0], "40.000"),
+                (parents[1], "40.000"),
+                (parents[2], "40.000"),
+            ),
+        )
+        assert response.status_code == 201, response.text
+        child_data = response.json()
+        child_id = UUID(child_data["id"])
+
+        # Lô con nhận đủ 120.000 kg
+        assert_mass(admin_session, child_id, "120.000", "active")
+
+        # Cả ba lô mẹ còn lại đúng 0.000 kg và chuyển trạng thái closed
+        for parent in parents:
+            assert_mass(admin_session, parent.id, "0.000", "closed")
+
+        # Quan hệ phả hệ ghi rõ cả 3 lô mẹ
+        edges = relations(admin_session, child_id)
+        assert len(edges) == 3
+        assert {(e["parent_lot_id"], e["quantity"], e["operation"]) for e in edges} == {
+            (parents[0].id, Decimal("40.000"), "merge"),
+            (parents[1].id, Decimal("40.000"), "merge"),
+            (parents[2].id, Decimal("40.000"), "merge"),
+        }
+
+        # Kiểm tra event chain của lô mới và cả ba lô mẹ
+        for lot_id in [child_id, *(p.id for p in parents)]:
+            history = await api.get(f"/api/v1/events/lots/{lot_id}/history")
+            assert history.status_code == 200, history.text
+            assert history.json()["integrity"]["valid"] is True
+            expected_type = "lot_derived" if lot_id == child_id else "lot_merged"
+            assert history.json()["events"][-1]["event_type"] == expected_type
+
+
+@pytest.mark.asyncio
+async def test_n341_merge_partial_quantities_deducts_exact_portions(
+    lineage, admin_session
+):
+    """N3-41 AC2: Gộp một phần của mỗi lô -> lô mới có khối lượng bằng tổng phần lấy, mỗi lô mẹ trừ đúng phần đó."""
+    owner, products, _ = lineage
+    parents = [add_lot(admin_session, owner, products[0]) for _ in range(3)]
+    async with client() as api:
+        await login(api, owner)
+        response = await api.post(
+            "/api/v1/lots/merge",
+            json=merge_body(
+                (parents[0], "12.345"),
+                (parents[1], "10.000"),
+                (parents[2], "7.655"),
+            ),
+        )
+        assert response.status_code == 201, response.text
+        child_id = UUID(response.json()["id"])
+
+        # Lô mới nhận đúng tổng 30.000 kg
+        assert_mass(admin_session, child_id, "30.000", "active")
+
+        # Mỗi lô mẹ trừ đúng phần lấy ra, không lệch một gram
+        assert_mass(admin_session, parents[0].id, "27.655", "active")
+        assert_mass(admin_session, parents[1].id, "30.000", "active")
+        assert_mass(admin_session, parents[2].id, "32.345", "active")
+
+        # Quan hệ phả hệ ghi nhận trọng số từng phần
+        edges = relations(admin_session, child_id)
+        assert {(e["parent_lot_id"], e["quantity"], e["operation"]) for e in edges} == {
+            (parents[0].id, Decimal("12.345"), "merge"),
+            (parents[1].id, Decimal("10.000"), "merge"),
+            (parents[2].id, Decimal("7.655"), "merge"),
+        }
+
+
+@pytest.mark.asyncio
+async def test_n341_merge_different_products_rejected_with_reason_and_offending_lot(
+    lineage, admin_session
+):
+    """N3-41 AC3: Hai lô khác sản phẩm khi gộp thì bị chặn kèm lý do nêu mã/tên lô vi phạm."""
+    owner, products, _ = lineage
+    p1 = add_lot(admin_session, owner, products[0])
+    p2 = add_lot(admin_session, owner, products[1])
+    async with client() as api:
+        await login(api, owner)
+        response = await api.post(
+            "/api/v1/lots/merge",
+            json=merge_body((p1, "10.000"), (p2, "10.000")),
+        )
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert p2.lot_code in detail or p2.name in detail
+    assert "khác nông sản" in detail
+
+    # Khối lượng các lô mẹ không thay đổi
+    assert_mass(admin_session, p1.id, "40.000")
+    assert_mass(admin_session, p2.id, "40.000")
+
+
+@pytest.mark.asyncio
+async def test_n341_merge_foreign_lot_rejected_with_403_and_offending_lot(
+    lineage, admin_session
+):
+    """N3-41 AC4: Một trong các lô không do tổ chức mình giữ khi gộp thì bị chặn 403 kèm thông báo."""
+    owner, products, identities = lineage
+    outsider = identities(role="distributor", organization_type="distribution")
+    p1 = add_lot(admin_session, owner, products[0])
+    foreign_lot = add_lot(admin_session, outsider, products[0])
+
+    async with client() as api:
+        await login(api, owner)
+        response = await api.post(
+            "/api/v1/lots/merge",
+            json=merge_body((p1, "10.000"), (foreign_lot, "10.000")),
+        )
+    assert response.status_code == 403, response.text
+    detail = response.json()["detail"]
+    assert foreign_lot.lot_code in detail or foreign_lot.name in detail
+    assert "không do tổ chức" in detail or "chỉ được xử lý lô do tổ chức mình" in detail
+
+    # Khối lượng các lô không thay đổi
+    assert_mass(admin_session, p1.id, "40.000")
+    assert_mass(admin_session, foreign_lot.id, "40.000")
+
+
+@pytest.mark.asyncio
+async def test_n341_concurrent_cross_merge_no_deadlock(lineage, admin_session):
+    """N3-120: Khóa theo thứ tự cố định để hai phép gộp chéo nhau không deadlock / treo giao dịch."""
+    owner, products, _ = lineage
+    p1 = add_lot(admin_session, owner, products[0])
+    p2 = add_lot(admin_session, owner, products[0])
+
+    async with client() as api1, client() as api2:
+        await login(api1, owner)
+        await login(api2, owner)
+
+        # Tx1 gộp (p1, 20), (p2, 20); Tx2 gộp chéo thứ tự (p2, 20), (p1, 20)
+        res1, res2 = await asyncio.gather(
+            api1.post(
+                "/api/v1/lots/merge",
+                json=merge_body((p1, "20.000"), (p2, "20.000")),
+            ),
+            api2.post(
+                "/api/v1/lots/merge",
+                json=merge_body((p2, "20.000"), (p1, "20.000")),
+            ),
+        )
+
+    # Nhờ order_by(Lot.id) trong _lock_parents, cả hai giao dịch hoàn tất không bị deadlock
+    assert res1.status_code == 201, res1.text
+    assert res2.status_code == 201, res2.text
+
+    # Cả hai lô mẹ bị trừ chính xác 20 + 20 = 40 kg, còn lại 0.000 và closed
+    assert_mass(admin_session, p1.id, "0.000", "closed")
+    assert_mass(admin_session, p2.id, "0.000", "closed")

@@ -25,6 +25,13 @@ test('split starts with empty amounts and disabled submission', async () => {
   assert.match(output, /Lô nguồn sẽ còn 40.000/)
   assert.match(output, /disabled="">Xác nhận tách lô/)
 })
+test('merge starts in merge mode with disabled submission until valid candidates chosen', async () => {
+  window.location.search = '?task=merge'
+  const output = html(await load('LotTransformForm'), {lot, initialMode: 'merge', canManageDistribution: false, onCompleted: () => {}})
+  assert.match(output, /Gộp cùng sản phẩm/)
+  assert.match(output, /Các lô mẹ và phần khối lượng lấy ra/)
+  assert.match(output, /disabled="">Xác nhận gộp lô/)
+})
 test('manual event form requires confirmation and excludes reserved business events', async () => {
   const output = html(await load('EventCreateForm'), {lot})
   assert.match(output, /disabled="">Lưu sự kiện/)
