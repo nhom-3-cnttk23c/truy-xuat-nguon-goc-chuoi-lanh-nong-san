@@ -124,24 +124,22 @@ export function SecurityPanel({
               Ma trận phân quyền
             </h2>
             <p className="panel-sub">
-              So sánh quyền Sprint 2. Dữ liệu lô được giới hạn theo đơn vị đang giữ; danh mục sản phẩm dùng chung chỉ quản trị hệ thống được sửa.
+              So sánh quyền theo vai trò. Dữ liệu lô được giới hạn theo đơn vị đang giữ; danh mục nông sản dùng chung chỉ quản trị hệ thống được sửa.
             </p>
           </div>
         </div>
 
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table security-matrix">
             <thead>
               <tr>
-                <th>Mã Vai trò</th>
-                <th>Tên Nghiệp vụ</th>
+                <th>Vai trò</th>
                 <th>Vùng trồng</th>
                 <th>Lô hàng</th>
-                <th>Danh mục SP</th>
+                <th>Nông sản</th>
                 <th>Sự kiện</th>
                 <th>Bàn giao</th>
                 <th>Bảo mật</th>
-                <th>Phiên hiện tại</th>
               </tr>
             </thead>
             <tbody>
@@ -155,13 +153,11 @@ export function SecurityPanel({
                     key={roleCode}
                     className={isCurrent ? 'row-editing' : undefined}
                   >
-                    <td>
-                      <code>{roleCode}</code>
-                    </td>
                     <th scope="row" className="cell-strong">
                       {ROLE_LABELS[roleCode]}
+                      {isCurrent && <div><span className="status-badge status-done">Vai trò của bạn</span></div>}
                     </th>
-                    <td>
+                    <td data-label="Vùng trồng">
                       <PermissionBadge
                         allowed={canReadFarms}
                         granted={perms.includes('farms:read_all') ? 'Xem toàn cục' : 'Xem đơn vị'}
@@ -173,7 +169,7 @@ export function SecurityPanel({
                         denied={canReadFarms ? 'Chỉ xem' : '—'}
                       />
                     </td>
-                    <td>
+                    <td data-label="Lô hàng">
                       <PermissionBadge
                         allowed={perms.includes('lots:read') || perms.includes('lots:read_all')}
                         granted={perms.includes('lots:read_all') ? 'Xem toàn cục' : 'Lô đang giữ'}
@@ -185,14 +181,14 @@ export function SecurityPanel({
                         denied="Không tạo"
                       />
                     </td>
-                    <td>
+                    <td data-label="Nông sản">
                       <PermissionBadge
                         allowed={perms.includes('products:write')}
                         granted="Sửa danh mục"
                         denied={perms.includes('products:read') ? 'Chỉ xem' : 'Không truy cập'}
                       />
                     </td>
-                    <td>
+                    <td data-label="Sự kiện">
                       <PermissionBadge
                         allowed={perms.includes('events:create')}
                         granted="Ghi sự kiện"
@@ -204,7 +200,7 @@ export function SecurityPanel({
                         denied="Không kiểm tra"
                       />
                     </td>
-                    <td>
+                    <td data-label="Bàn giao">
                       <PermissionBadge
                         allowed={perms.includes('handovers:create')}
                         granted="Gửi yêu cầu"
@@ -216,19 +212,12 @@ export function SecurityPanel({
                         denied="Không xử lý"
                       />
                     </td>
-                    <td>
+                    <td data-label="Bảo mật">
                       <PermissionBadge
                         allowed={perms.includes('security:read')}
                         granted="Xem ma trận"
                         denied="Không xem"
                       />
-                    </td>
-                    <td>
-                      {isCurrent ? (
-                        <span className="status-badge status-done">Đang dùng</span>
-                      ) : (
-                        <span className="panel-sub">—</span>
-                      )}
                     </td>
                   </tr>
                 )
