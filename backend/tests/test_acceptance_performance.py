@@ -223,7 +223,7 @@ def test_five_thousand_lots_filtered_cursor_page_under_300ms(
                         summarize(child)
 
                 summarize(plan)
-            assert elapsed < 1.0, f"5000 lots query took {elapsed:.3f}s"
+            assert elapsed < 0.3, f"5000 lots query took {elapsed:.3f}s"
             print(f"5000 lots, filtered 20-row page: {elapsed * 1000:.1f}ms")
             following = lot_service.list_lots(
                 db,

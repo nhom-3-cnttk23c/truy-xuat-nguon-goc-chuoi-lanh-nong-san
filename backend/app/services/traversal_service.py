@@ -17,7 +17,9 @@ from app.schemas.lot import LotRead
 from app.services import ancestor_cache
 
 
-def _roots_and_check_cycle(ids: set[UUID], edges: list[LotRelation]) -> list[UUID]:
+def _roots_and_check_cycle(
+    db: Session, ids: set[UUID], edges: list[LotRelation]
+) -> list[UUID]:
     indegree = dict.fromkeys(ids, 0)
     children: dict[UUID, list[UUID]] = {id: [] for id in ids}
     for edge in edges:
@@ -34,9 +36,24 @@ def _roots_and_check_cycle(ids: set[UUID], edges: list[LotRelation]) -> list[UUI
             if indegree[child] == 0:
                 queue.append(child)
     if visited != len(ids):
+        # Kahn's remainder also includes descendants of a cycle. Follow incoming
+        # edges until a node repeats, so the notice names a node in the cycle.
+        remaining = {id for id, degree in indegree.items() if degree > 0}
+        parents: dict[UUID, list[UUID]] = {id: [] for id in remaining}
+        for edge in edges:
+            if edge.parent_lot_id in remaining and edge.child_lot_id in remaining:
+                parents[edge.child_lot_id].append(edge.parent_lot_id)
+        cycle_id = min(remaining)
+        seen: set[UUID] = set()
+        while cycle_id not in seen:
+            seen.add(cycle_id)
+            cycle_id = min(parents[cycle_id])
+        # Read through the same RLS session; never disclose an unauthorized name.
+        lot = db.get(Lot, cycle_id)
+        label = (lot.lot_code or lot.name) if lot else str(cycle_id)
         raise HTTPException(
             409,
-            f"Phát hiện chu trình trong dữ liệu phả hệ liên quan lô {min(id for id, degree in indegree.items() if degree > 0)}; cần kiểm tra dữ liệu nguồn.",
+            f"Phát hiện chu trình trong dữ liệu phả hệ liên quan lô {label}; cần kiểm tra dữ liệu nguồn.",
         )
     return sorted(roots)
 
@@ -87,7 +104,7 @@ def get_lineage(
     ids = {lot_id}
     for edge in edges:
         ids.update((edge.parent_lot_id, edge.child_lot_id))
-    roots = _roots_and_check_cycle(ids, edges)
+    roots = _roots_and_check_cycle(db, ids, edges)
     rows = db.execute(
         select(Lot, Farm, lot_is_historical(Lot, principal))
         .outerjoin(Farm, Farm.id == Lot.farm_id)
@@ -141,7 +158,7 @@ def get_detail(db: Session, principal: Principal, lot_id: UUID) -> dict:
     ids = {lot_id}
     for edge in edges:
         ids.update((edge.parent_lot_id, edge.child_lot_id))
-    _roots_and_check_cycle(ids, edges)
+    _roots_and_check_cycle(db, ids, edges)
     event_count = (
         select(func.count())
         .select_from(Event)

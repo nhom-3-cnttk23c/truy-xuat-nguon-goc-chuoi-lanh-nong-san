@@ -68,6 +68,12 @@ async def test_trace_merge_has_all_roots_and_descendants(lineage, admin_session)
             f"/api/v1/lots/{roots[0].id}/lineage?direction=descendants"
         )
         assert cycle.status_code == 409, cycle.text
+        cycle_codes = {
+            roots[0].lot_code,
+            first_child["lot_code"],
+            merged.json()["lot_code"],
+        }
+        assert any(code in cycle.json()["detail"] for code in cycle_codes)
 
 
 @pytest.mark.asyncio
@@ -230,7 +236,7 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
             assert result.status_code == 200, result.text
             assert len(result.json()["nodes"]) == 1000
             assert len(result.json()["edges"]) == 999
-            assert elapsed < 5, f"{direction}: {elapsed:.3f}s"
+            assert elapsed < 2, f"{direction}: {elapsed:.3f}s"
 
 
 def test_detail_uses_three_queries_with_runtime_role(lineage, admin_session):
