@@ -6,7 +6,7 @@ from time import perf_counter
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, event
+from sqlalchemy import delete, event, text
 
 from app.core.database import SessionLocal, set_db_context
 from app.models.farm import Farm
@@ -34,6 +34,11 @@ def test_two_hundred_event_history_one_event_query_under_200ms(
             set_db_context(db, session_token_hash=owner.session_token_hash)
             statements = []
             connection = db.connection()
+            # Exercise the nested-loop plan observed on CI: organization RLS
+            # must not be re-evaluated once for each event in the history.
+            connection.execute(text("SET LOCAL enable_hashjoin = off"))
+            connection.execute(text("SET LOCAL enable_mergejoin = off"))
+            connection.execute(text("SET LOCAL enable_material = off"))
 
             def capture(conn, cur, statement, parameters, context, many):
                 statements.append((statement, parameters))
@@ -45,6 +50,25 @@ def test_two_hundred_event_history_one_event_query_under_200ms(
             event.remove(connection, "before_cursor_execute", capture)
             assert len(result["events"]) == 200 and result["integrity"]["valid"]
             assert sum("FROM events" in statement for statement, _ in statements) == 1
+            history_sql, history_parameters = next(
+                (sql, params) for sql, params in statements if "FROM events" in sql
+            )
+            history_plan = connection.exec_driver_sql(
+                "EXPLAIN (ANALYZE, FORMAT JSON) " + history_sql, history_parameters
+            ).scalar()[0]["Plan"]
+
+            def nodes(plan):
+                yield plan
+                for child in plan.get("Plans", []):
+                    yield from nodes(child)
+
+            organization_scans = [
+                node
+                for node in nodes(history_plan)
+                if node.get("Relation Name") == "organizations"
+            ]
+            assert organization_scans
+            assert all(node["Actual Loops"] <= 1 for node in organization_scans)
             if elapsed >= 0.2:
                 statement, parameters = next(
                     item for item in statements if "FROM events" in item[0]

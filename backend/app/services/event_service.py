@@ -5,12 +5,13 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, contains_eager
 
 from app.core.auth import Principal
 from app.core.crypto import GENESIS_PREV_HASH, compute_event_hash
 from app.core.tenancy import get_tenant_record, tenant_select
 from app.models.event import Event
+from app.models.identity import Organization
 from app.models.integrity_check import IntegrityCheck
 from app.models.lot import Lot
 from app.schemas.event import EventCreate, EventRead, IntegrityIssue
@@ -274,9 +275,16 @@ def get_event_history(
 ) -> dict:
     """Stream full verification in one event query, retain only the requested page."""
     get_tenant_record(db, Lot, lot_id, principal, allow_historical=True)
+    # Evaluate organization RLS once, even if PostgreSQL chooses a nested-loop
+    # join for a small organization table and hundreds of history events.
+    visible_organizations = (
+        select(Organization).cte("history_organizations").prefix_with("MATERIALIZED")
+    )
+    organization = aliased(Organization, visible_organizations)
     statement = (
         select(Event)
-        .options(joinedload(Event.organization))
+        .outerjoin(organization, Event.organization_id == organization.id)
+        .options(contains_eager(Event.organization, alias=organization))
         .where(Event.lot_id == lot_id)
         .order_by(Event.sequence_number.asc())
         .execution_options(yield_per=100)

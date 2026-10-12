@@ -7,7 +7,7 @@ Báo cáo này ghi nhận kiểm tra local trên nhánh `fix/sprint-acceptance-h
 | Kiểm tra | Kết quả local |
 |---|---|
 | Backend tích hợp, quyền/RLS, tách/gộp, bàn giao, hash, CSV, audit | 238 passed, 3 test hiệu năng tách riêng |
-| Hiệu năng không chạy cùng coverage | 3 passed; lịch sử 200 sự kiện ~143 ms; danh sách 5.000 lô ~76 ms; đồ thị 1.000 node ~0,80 s xuôi / ~0,73 s ngược |
+| Hiệu năng không chạy cùng coverage | 3 passed; lịch sử 200 sự kiện ~68 ms với nested-loop cưỡng bức; danh sách 5.000 lô ~76 ms; đồ thị 1.000 node ~0,80 s xuôi / ~0,73 s ngược |
 | Coverage nhánh / main cùng bộ đo | 91,57% / 91,48%; không giảm |
 | Frontend | 12 test offline, lint và TypeScript/production build đạt |
 | Thư viện | npm audit và pip-audit không phát hiện lỗ hổng tại thời điểm chạy |
@@ -17,6 +17,8 @@ Báo cáo này ghi nhận kiểm tra local trên nhánh `fix/sprint-acceptance-h
 | Quyền runtime | Web không giữ mật khẩu migration; vai trò app không SUPERUSER/BYPASSRLS |
 
 Số đo là trên máy local và bộ dữ liệu test cố định, không phải SLA staging. Test frontend render HTML offline, **chưa chứng minh** focus, drag/pan, mobile hoặc mọi thao tác trình duyệt của bản mới. Coverage artifact do CI tái tạo; không commit bản build/cache.
+
+Một lượt CI phát hiện history 436 ms do quét tổ chức 200 lần khi planner chọn nested-loop. Đã materialize các tổ chức được RLS cho phép ngay trong cùng truy vấn; test EXPLAIN kiểm bảng tổ chức chỉ được quét một lần, giữ ngưỡng 200 ms. [PostgreSQL MATERIALIZED](https://www.postgresql.org/docs/16/queries-with.html#QUERIES-WITH-CTE-MATERIALIZATION) giới hạn việc tính lại CTE; không tắt kiểm quyền.
 
 ## Các thiếu sót đã xử lý trong mã
 
