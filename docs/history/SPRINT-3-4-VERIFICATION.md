@@ -1,3 +1,5 @@
+> Tài liệu lịch sử. Xem [tình trạng nghiệm thu hiện hành](../ACCEPTANCE.md).
+
 # Bằng chứng triển khai Sprint 3–4 local
 
 Cập nhật 12/10/2026. Chủ dự án đã cho phép commit/push ngày 12/10/2026; baseline trước phát hành là `030bab3`. Checkout frontend ban đầu được giữ nguyên. Đây là bằng chứng kiểm chứng nghiệp vụ local, chưa nghiệm thu staging hoặc chuyển Jira Done. **Chưa hoàn tất tất cả nhiệm vụ con**: xem [đối chiếu trực tiếp Jira](SPRINT-3-4-SUBTASK-AUDIT.md). Những kết quả dưới đây không chứng minh toàn bộ AC đã đạt.
@@ -7,7 +9,7 @@ Cập nhật 12/10/2026. Chủ dự án đã cho phép commit/push ngày 12/10/2
 **Lượt sửa UX 12/10:** các bằng chứng browser bên dưới ghi trước khi chuyển
 giao diện hộp thoại/trang thao tác hiện tại. Frontend mới có 12 test logic/render offline,
 lint/build qua; browser chưa kiểm lại do công cụ từ chối truy cập localhost.
-Xem [UX và hướng dẫn demo](UX-DEMO.md). Không dùng ảnh/script browser cũ
+Xem [UX và hướng dẫn demo](../UX-DEMO.md). Không dùng ảnh/script browser cũ
 để xác nhận toàn bộ luồng UX mới đã qua.
 
 | Phạm vi | Bằng chứng |
@@ -41,7 +43,7 @@ Review độc lập bằng agent: foundation, seed, overdue, CSV, lifecycle, aud
 
 - Test Windows local từ `backend`: `./scripts/test-local.ps1` dùng DB `ttcs_s34_tests` và runtime `ttcs_s34_test_app`. Hook pytest chặn DB demo `ttcs_test` tại localhost:55434 trước mọi test/fixture. Script khôi phục biến môi trường sau chạy. CI dùng DB test dịch vụ riêng tại cổng 5432.
 - Từ `frontend`: `npm ci`, `npm run lint`, `npm run build`, `npm audit`; dev server dùng `VITE_BACKEND_TARGET` trỏ đến API local.
-- Fixture demo: `APP_ENV=development` hoặc `staging`, đặt rõ `DEMO_PASSWORD`, chạy `python -m app.seed_lineage_demo`. Chỉ chạy trên DB demo; seed idempotent, không thay mật khẩu đã tồn tại. [Đáp án phả hệ](LINEAGE-ACCEPTANCE.md).
+- Fixture demo: `APP_ENV=development` hoặc `staging`, đặt rõ `DEMO_PASSWORD`, chạy `python -m app.seed_lineage_demo`. Chỉ chạy trên DB demo; seed idempotent, không thay mật khẩu đã tồn tại. [Đáp án phả hệ](../LINEAGE-ACCEPTANCE.md).
 - Maintenance riêng với credential owner: `python -m app.jobs.overdue_handovers --once`; bỏ `--once` để quét mỗi giờ. Không dùng credential owner cho HTTP API. `HANDOVER_OVERDUE_HOURS=48` cấu hình ngưỡng.
 - Lịch sử có `payload_redacted=true` là bản hiển thị đã giới hạn quyền. Hash và kết quả integrity được kiểm trên Event gốc ở máy chủ; không dùng payload đã ẩn để tính lại hash phía client.
 

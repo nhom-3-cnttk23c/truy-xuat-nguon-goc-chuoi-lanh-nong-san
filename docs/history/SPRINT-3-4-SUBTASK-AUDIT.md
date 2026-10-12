@@ -1,3 +1,5 @@
+> Tài liệu lịch sử. Xem [tình trạng nghiệm thu hiện hành](../ACCEPTANCE.md).
+
 # Đối chiếu nhiệm vụ con Sprint 3–4
 
 Cập nhật code local 12/10/2026; snapshot Jira đọc lại ngày 12/10/2026. Phạm vi 16 story, 21 nhiệm vụ con.
@@ -32,7 +34,7 @@ Toàn bộ 21 nhiệm vụ con trên Jira vẫn ở trạng thái **Cần làm**
 Ưu tiên tiếp theo: sửa các thiếu sót chức năng/UI và quyền; bổ sung bằng chứng
 đồng thời/integrity; đối chiếu lại seed/oracle; chạy lại kiểm thử và browser.
 Không đánh dấu toàn bộ hoàn tất dựa riêng vào số test qua.
-Chi tiết thay đổi UX và giới hạn kiểm chứng ở [UX và demo](UX-DEMO.md).
+Chi tiết thay đổi UX và giới hạn kiểm chứng ở [UX và demo](../UX-DEMO.md).
 
 Baseline trước commit là `030bab3`; checkout frontend ban đầu giữ nguyên.
 Đã xác nhận quyền push trên fork hieu-kiien ngày 12/10. Bản tích hợp dùng

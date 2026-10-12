@@ -1,3 +1,5 @@
+> Tài liệu lịch sử. Xem [tình trạng nghiệm thu hiện hành](../ACCEPTANCE.md).
+
 # Kế hoạch hoàn thành Sprint 3–4
 
 Cập nhật code local 12/10/2026 (Asia/Saigon), snapshot Jira đọc lại ngày 12/10. Phạm vi: 16 story trên Jira, 9 ở Sprint 3 và 7 ở Sprint 4. Tài liệu tổng hợp có thể tái tạo; không thay thế bằng chứng nghiệm thu. Owner triển khai: hieu-kiien, theo xác nhận của người dùng. Không ghi tác giả hoặc đồng tác giả cho người chưa tham gia.

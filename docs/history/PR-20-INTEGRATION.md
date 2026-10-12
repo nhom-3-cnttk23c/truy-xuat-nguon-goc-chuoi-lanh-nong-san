@@ -1,3 +1,5 @@
+> Tài liệu lịch sử. Xem [tình trạng nghiệm thu hiện hành](../ACCEPTANCE.md).
+
 # Tích hợp lịch sử PR #20
 
 PR #22 đã được merge vào `main` trước khi tích hợp PR #20. Nhánh

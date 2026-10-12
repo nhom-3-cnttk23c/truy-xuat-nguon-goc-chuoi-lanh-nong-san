@@ -1,3 +1,5 @@
+> Tài liệu lịch sử. Xem [tình trạng nghiệm thu hiện hành](../ACCEPTANCE.md).
+
 # Tình hình dự án Nhóm 3 — 06/10/2026
 
 Snapshot kiểm tra ngày 06/10/2026 (Asia/Saigon), từ Jira, GitHub và mã nguồn. Đây là báo cáo; không thay đổi trạng thái, lịch hoặc phân công trên Jira.

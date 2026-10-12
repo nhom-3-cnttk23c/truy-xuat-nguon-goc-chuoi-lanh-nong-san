@@ -1,195 +1,76 @@
-# AgroChain — Hệ thống Truy xuất Nguồn gốc & Giám sát Chuỗi lạnh Nông sản
+# AgroChain — Truy xuất nguồn gốc nông sản
 
-**Kế hoạch Sprint 3–4 (11/10/2026):** [docs/SPRINT-3-4-DELIVERY.md](docs/SPRINT-3-4-DELIVERY.md) — phạm vi Jira, thứ tự nhánh/PR, điều kiện nghiệm thu và ghi nhận đóng góp thật.
+Học phần TTCS, nhóm TTCS_T926_K18C4_N3. Quản lý vùng trồng, nông sản, lô thu hoạch, bàn giao, tách/gộp, nguồn gốc, phân phối và nhật ký.
 
-> Học phần: Thực tập cơ sở (TTCS) — Nhóm `TTCS_T926_K18C4_N3`
->
+## Sử dụng
+- [Web staging](https://ttcs-frontend-staging.onrender.com)
+- [API tương tác](https://ttcs-backend-staging.onrender.com/docs)
+- [Hướng dẫn demo từng vai trò](docs/UX-DEMO.md)
+- [Tài liệu và tình trạng nghiệm thu](docs/README.md)
 
-> **Môi trường Trực tuyến (Staging - Render):**
-> - **Giao diện Người dùng (Frontend Web):** [https://ttcs-frontend-staging.onrender.com](https://ttcs-frontend-staging.onrender.com) *(Khuyên dùng: Chỉ cần mở link này để sử dụng)*
-> - **Cổng Dịch vụ API (Backend Service):** [https://ttcs-backend-staging.onrender.com](https://ttcs-backend-staging.onrender.com)
-> - **Tài liệu API tương tác (Swagger UI):** [https://ttcs-backend-staging.onrender.com/docs](https://ttcs-backend-staging.onrender.com/docs)
-> - **Tài liệu API (Redoc):** [https://ttcs-backend-staging.onrender.com/redoc](https://ttcs-backend-staging.onrender.com/redoc)
-> 
-> *💡 Ghi chú cho thành viên nhóm & chấm bài:* Chỉ cần mở link **Frontend Web** trên trình duyệt để trải nghiệm toàn bộ hệ thống mà không cần cài đặt bất kỳ công cụ nào vào máy tính cá nhân.
+Chức năng cảm biến tự động, thu hồi, QR và báo cáo PDF thuộc sprint sau. Có thể ghi sự kiện thủ công; không coi đó là tích hợp cảm biến đã hoàn thành.
 
-
-Hệ thống quản lý quy trình chuỗi lạnh nông sản từ vùng trồng đến phân phối: theo dõi lô hàng, ghi nhật ký telemetry (nhiệt độ, độ ẩm, GPS) theo cơ chế bất biến và phân quyền đa tổ chức.
-
----
-
-### Bảng Địa chỉ Môi trường (Environments)
-
-| Môi trường | Frontend Web | Backend API Service | Tài liệu API (Swagger / Redoc) |
-|---|---|---|---|
-| **Staging (Cloud Render)** | [ttcs-frontend-staging.onrender.com](https://ttcs-frontend-staging.onrender.com) | [ttcs-backend-staging.onrender.com](https://ttcs-backend-staging.onrender.com) | [/docs](https://ttcs-backend-staging.onrender.com/docs) \| [/redoc](https://ttcs-backend-staging.onrender.com/redoc) |
-| **Local (Docker / Dev)** | [http://localhost:5173](http://localhost:5173) | [http://localhost:8000](http://localhost:8000) | [http://localhost:8000/docs](http://localhost:8000/docs) |
-
----
-
-## 1. Phân hệ Kỹ thuật Cốt lõi
-
-| Mã phân hệ | Nghiệp vụ | Giải pháp kỹ thuật | Trạng thái |
-|---|---|---|---|
-| **N3-4** | Toàn vẹn dữ liệu chuỗi lạnh | Băm SHA-256 nối chuỗi + chuẩn hóa Canonical JSON RFC 8785 | Đạt kiểm thử |
-| **N3-5** | Quản lý xác thực & phiên | Argon2id + Cookie HttpOnly (`__Host-session`, SameSite=None, Secure) | Đạt kiểm thử |
-| **N3-6** | Phân quyền & Đa tổ chức | PostgreSQL FORCE Row Level Security (RLS) + RBAC | Đạt kiểm thử |
-| **N3-7** | Danh mục vùng trồng | Tọa độ GPS chuẩn WGS84, mã định danh UUID v4 | Đạt kiểm thử |
-| **N3-21** | Bất biến nhật ký sự kiện | Trigger PostgreSQL chặn mọi thao tác UPDATE/DELETE | Đạt kiểm thử |
-
----
-
-## 2. Tài khoản Thử nghiệm (Demo Accounts)
-
-Hệ thống được khởi tạo sẵn dữ liệu mẫu cho 3 vai trò nghiệp vụ. Mật khẩu mặc định cho toàn bộ tài khoản mẫu là: `Password123!`
-
-| Vai trò | Email đăng nhập | Mật khẩu | Phạm vi quyền hạn |
-|---|---|---|---|
-| **Nông hộ (Grower)** | `grower@caudat.vn` | `Password123!` | Quản lý nông trại Cầu Đất, tạo lô hàng, ghi nhật ký chuỗi lạnh |
-| **Quản trị HTX (Admin)** | `admin@mocchau.vn` | `Password123!` | Quản lý hợp tác xã Mộc Châu, phân quyền thành viên và vùng trồng |
-| **Thanh tra viên (Inspector)** | `inspector@chicuc.gov.vn` | `Password123!` | Đọc dữ liệu toàn hệ thống, kiểm tra chéo tính toàn vẹn chuỗi sự kiện |
-
-*Cơ chế chống brute-force: Nhập sai mật khẩu 5 lần liên tiếp sẽ bị khóa phiên tạm thời 15 phút.*
-
----
-
-## 3. Công nghệ Sử dụng
-
-- **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL 16 (`psycopg3`).
-- **Frontend:** React 19, TypeScript, Vite, Vanilla CSS.
-- **Kiểm thử & Linter:** Pytest (Async/ASGITransport), Ruff, Oxlint.
-- **Hạ tầng:** Docker, Docker Compose, Render (Web Service + Static Site + Managed PostgreSQL), GitHub Actions CI/CD.
-
----
-
-## 4. Cấu trúc Dự án
-
-```text
-.
-├── backend/
-│   ├── alembic/             # Quản lý phiên bản migration cơ sở dữ liệu
-│   ├── app/
-│   │   ├── api/v1/          # Endpoints: auth, farms, lots, events
-│   │   ├── core/            # Config, database engine, auth, crypto
-│   │   ├── models/          # SQLAlchemy ORM models
-│   │   ├── schemas/         # Pydantic schemas (validation & serialization)
-│   │   ├── services/        # Nghiệp vụ băm, tính toàn vẹn chuỗi sự kiện
-│   │   ├── main.py          # Khởi tạo ứng dụng FastAPI & cấu hình CORS
-│   │   └── startup.py       # Bootstrap quyền database và nâng cấp migration
-│   └── tests/               # Kiểm thử tự động (Pytest)
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # LoginView, FarmWorkspace, LotsPanel, EventTimeline
-│   │   ├── services/api.ts  # Tầng kết nối REST API & quản lý phiên
-│   │   ├── types/           # Định nghĩa Type TypeScript
-│   │   ├── App.tsx          # Điều hướng & đồng bộ phiên
-│   │   └── index.css        # Hệ thống thiết kế giao diện
-│   └── vite.config.ts       # Cấu hình Vite & reverse proxy dev
-├── docs/                    # Tài liệu đặc tả kỹ thuật (API, RLS, tính toàn vẹn)
-├── docker-compose.yml       # Cấu hình container khởi chạy toàn bộ dịch vụ
-└── Makefile                 # Tập hợp các lệnh tắt phục vụ phát triển
-```
-
----
-
-## 5. Hướng dẫn Khởi chạy
-
-### Cách 1: Khởi chạy bằng Docker Compose (Khuyên dùng)
-
-Yêu cầu máy đã cài và bật Docker Desktop:
-
-```bash
-# 1. Sao chép file cấu hình môi trường
+## Chạy local
+Yêu cầu Docker Desktop:
+```sh
 cp .env.example .env
-
-# 2. Khởi chạy toàn bộ hệ thống (PostgreSQL + Backend + Frontend)
+# Điền DB_PASSWORD và DB_ADMIN_PASSWORD trong .env.
 docker compose up --build -d
 ```
+Web: http://localhost:5173. API: http://localhost:8000/docs.
+Dừng bằng `docker compose down`; không thêm `-v` nếu cần giữ dữ liệu.
 
-Sau khi khởi động hoàn tất:
-- **Giao diện Web:** [http://localhost:5173](http://localhost:5173)
-- **Backend API Service:** [http://localhost:8000](http://localhost:8000)
-- **Tài liệu API (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Tài liệu API (Redoc):** [http://localhost:8000/redoc](http://localhost:8000/redoc)
-- **Dừng dịch vụ:** `docker compose down`
-
----
-
-### Cách 2: Khởi chạy trực tiếp trên máy (Local Development)
-
-#### 1. Backend (FastAPI)
-Yêu cầu Python 3.12+ và PostgreSQL 16:
-
-```bash
+Chạy trực tiếp (Python 3.12+, Node 20+, PostgreSQL 15+):
+```sh
 cd backend
-
-# Khởi tạo môi trường ảo
 python -m venv .venv
-
-# Kích hoạt môi trường ảo:
-# Windows (cmd/PowerShell):
-.venv\Scripts\activate
-# Linux/macOS:
-# source .venv/bin/activate
-
-# Cài đặt thư viện phát triển
+# Kích hoạt .venv theo hệ điều hành.
 pip install -r requirements-dev.txt
-
-# Cấu hình biến môi trường
 cp .env.example .env
-# Cập nhật DB_PASSWORD và DB_ADMIN_PASSWORD trong file .env cho khớp máy cục bộ
-
-# Chạy migration và khởi động server
+# Điền mật khẩu và địa chỉ DB vào .env.
 python -m app.startup
 ```
-
-#### 2. Frontend (React + Vite)
-Mở một cửa sổ terminal mới:
-
-```bash
+Trong terminal khác:
+```sh
 cd frontend
-
-# Cài đặt thư viện
-npm install
-
-# Chạy máy chủ phát triển
+npm ci
 npm run dev
 ```
+Đặt `VITE_BACKEND_TARGET` khi cần frontend dev proxy đến API local.
 
-*Lưu ý về Dev Proxy:* Khi chạy `npm run dev`, Vite được cấu hình proxy ngầm các yêu cầu `/api` sang Backend Staging (hoặc Backend local nếu đặt biến `VITE_BACKEND_TARGET`). Do đó, bạn có thể kiểm thử toàn bộ giao diện và chức năng đăng nhập ngay cả khi chưa bật PostgreSQL cục bộ.
+## Dữ liệu demo
+Seed chỉ chạy khi `APP_ENV=development` hoặc `staging`; production không tự tạo tài khoản mẫu.
+Mật khẩu demo lấy từ `DEMO_PASSWORD`, mặc định `Password123!` chỉ dành cho môi trường mẫu. Các vai trò/email xem trên trang `/demo`. Không dùng dữ liệu cá nhân thật để trình diễn.
 
----
+## Kiểm tra
+Backend local dùng **DB riêng**, không dùng DB đang trình diễn:
+```powershell
+cd backend
+./scripts/test-local.ps1 -TestArgs @('-q', '-m', 'not performance', '--cov=app', '--cov-report=json:coverage.json')
+./scripts/test-local.ps1 -TestArgs @('-q', '-m', 'performance')
+```
+Script này dành cho bộ PostgreSQL local đã cấu hình tại cổng 55434, DB `ttcs_s34_tests`. Với môi trường khác, cấu hình DB test riêng trước khi chạy `pytest`. Hook test chặn DB trình diễn local.
+```sh
+ruff check app tests alembic
+ruff format --check app tests alembic
+# Trong frontend:
+npm test
+npm run lint
+npm run build
+npm audit
+```
+CI chạy lint, test, typecheck/build, migration, quét thư viện và build images. Coverage được lưu thành artifact. Test xanh không thay nghiệm thu tương tác trên staging.
 
-## 6. Lệnh Thường dùng (Makefile)
+## Vận hành
+- `python -m app.startup`: kiểm cấu hình, chuẩn bị quyền DB, migrate trước khi phục vụ. Thiếu mật khẩu hoặc migration lỗi sẽ dừng.
+- `GET /health`: readiness DB và tình trạng job bảo trì; trả 503 khi chưa sẵn sàng.
+- `GET /version`: SHA bản phát hành; không lộ thông tin cấu hình.
+- Job quá hạn chạy khi web khởi động và mỗi giờ bằng một hàm DB chỉ được phép đánh dấu bàn giao chờ quá hạn. Web không giữ mật khẩu migration.
+- GitHub workflow định kỳ gọi health để đánh thức Render miễn phí. Lịch GitHub có thể trễ; free tier không có cam kết thời gian thực.
+- Render health check dùng `/health`; deploy workflow kiểm SHA đúng commit và hợp đồng API Sprint 1–4. Không lấy OpenAPI của bản cũ làm bằng chứng triển khai thành công.
+- Staging hiện dùng Render native build; Docker images gắn SHA là kiểm chứng build/tính truy vết, không phải images đang chạy trên Render.
 
-Nếu môi trường hỗ trợ `make`:
+## An toàn và đóng góp
+API kiểm RBAC, PostgreSQL kiểm RLS theo session. Sự kiện chỉ thêm; hash SHA-256/RFC 8785 giúp phát hiện sửa đổi nhưng không phải chữ ký số hay bằng chứng chống quản trị viên viết lại cả chuỗi. Chi tiết: [DB](docs/database.md), [toàn vẹn](docs/N3-4-INTEGRITY.md).
 
-| Lệnh | Mục đích |
-|---|---|
-| `make install` | Cài đặt dependencies cho cả Backend và Frontend |
-| `make dev-backend` | Khởi chạy máy chủ Backend (FastAPI) |
-| `make dev-frontend` | Khởi chạy máy chủ Frontend (Vite) |
-| `make test` | Chạy bộ kiểm thử tự động với Pytest |
-| `make lint` | Kiểm tra quy chuẩn mã nguồn (Ruff & Oxlint) |
-| `make lint-fix` | Tự động định dạng và sửa lỗi lint |
-| `make migrate` | Áp dụng bản migration mới nhất vào cơ sở dữ liệu |
-
----
-
-## 7. Kiến trúc An toàn Dữ liệu
-
-1. **Cô lập Đa tổ chức (PostgreSQL RLS):** Cơ chế Row Level Security được kích hoạt với mức nghiêm ngặt (`FORCE ROW LEVEL SECURITY`). Tầng ứng dụng derive tenant trực tiếp từ session hash trong transaction context, ngăn chặn triệt để nguy cơ giả mạo tổ chức từ tham số request.
-2. **Nhật ký Sự kiện Bất biến (N3-21):** Bảng `events` chỉ cấp quyền `SELECT` và `INSERT` cho app role. Hai database trigger `trg_events_prevent_update` và `trg_events_prevent_delete` chặn đứng mọi nỗ lực can thiệp hoặc sửa đổi dữ liệu đã ghi.
-3. **Quản lý Phiên (N3-5):** Phiên làm việc sử dụng cookie `__Host-session` với cờ `HttpOnly`, `Secure` và `SameSite=None`. Mã phiên không bao giờ xuất hiện trong response body hay Web Storage (`localStorage`), ngăn ngừa tấn công XSS đánh cắp phiên.
-
----
-
-## 8. Quy trình Đóng góp
-
-Vui lòng tham khảo [CONTRIBUTING.md](./CONTRIBUTING.md) để tuân thủ quy định về phân nhánh, đặt tên commit theo chuẩn Conventional Commits và tạo Pull Request.
-
-### Kiểm chứng Sprint 3–4 local
-
-Bộ mẫu nghiệp vụ: `3 lô thu hoạch → 6 lô tách → 3 lô gộp chéo → 6 lô tách cuối`.
-Xem [sơ đồ và oracle](docs/LINEAGE-ACCEPTANCE.md), [đối chiếu Jira](docs/SPRINT-3-4-SUBTASK-AUDIT.md)
-và [hướng dẫn demo](docs/UX-DEMO.md). Test local dùng DB riêng qua `backend/scripts/test-local.ps1`.
+Đóng góp qua nhánh và PR theo [CONTRIBUTING.md](CONTRIBUTING.md). Giữ tác giả thật; không dùng số commit/Contributors để chứng minh nghiệm thu. Chỉ chuyển Jira Done khi có đủ bằng chứng theo DoD hoặc có điều chỉnh được ghi nhận.

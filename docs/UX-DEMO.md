@@ -15,7 +15,7 @@ không tự xác nhận nghiệm thu.
 - Chi tiết lô có Tổng quan / Lịch sử sự kiện / Nguồn gốc, hỗ trợ bàn phím.
 - Một vùng cuộn tài liệu chính; bỏ giới hạn chiều cao/cuộn riêng của bảng.
   Bảng hẹp chuyển thành hàng có nhãn; sơ đồ vừa vùng chứa và có phóng to/thu nhỏ.
-- Danh sách và lịch sử tối đa 10 mục mỗi trang. Form gộp phân trang lô chưa chọn,
+- Danh sách lô tối đa 20 mục, lịch sử 10 sự kiện mỗi trang. Form gộp phân trang lô chưa chọn,
   luôn giữ lô đã chọn để kiểm tra lượng; tổng tính chính xác bằng số nguyên.
 - Kết quả tách giữ toàn bộ mã lô con. Hiện lý do không chọn được lô khác
   sản phẩm/chủ giữ; tách vượt lượng không lưu được.
@@ -39,7 +39,7 @@ Bằng chứng browser cũ được ghi trước lần sửa UX này và cần c
 Công cụ browser đã từ chối truy cập tab localhost theo chính sách giao thức URL;
 không sử dụng phương thức khác để vượt chặn.
 
-Các nhiệm vụ con còn thiếu ở [bảng đối chiếu](SPRINT-3-4-SUBTASK-AUDIT.md).
+Các yêu cầu cần nghiệm thu tiếp và quyết định thiết kế ở [bảng đối chiếu hiện hành](ACCEPTANCE.md).
 Không khẳng định toàn bộ tính năng hoàn hảo hoặc hai sprint đã nghiệm thu.
 Các script/ảnh/dữ liệu chuẩn bị demo trong `local_docs/` là artifact giả lập,
 có thể tái tạo, không chứa dữ liệu sản xuất.
