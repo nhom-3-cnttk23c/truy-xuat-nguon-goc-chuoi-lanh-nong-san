@@ -94,4 +94,5 @@ class LotDetailRead(LotRead):
     parents: list[GraphLotRead]
     children: list[GraphLotRead]
     direct_farms: list[FarmRead]
+    root_farms: list[FarmRead]
     event_count: int = Field(ge=0)

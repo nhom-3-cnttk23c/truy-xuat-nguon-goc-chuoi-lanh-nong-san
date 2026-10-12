@@ -57,6 +57,16 @@ def _valid_chain(count: int = 3):
     return events
 
 
+def test_streamed_verification_keeps_downstream_warnings():
+    events = _valid_chain(501)
+    events[499].payload["value"] = -1
+    result = verify_event_chain(iter(events))
+    assert result["checked_events"] == 501
+    assert result["first_invalid_sequence"] == 500
+    assert result["issues"][-1].sequence_number == 501
+    assert result["issues"][-1].kind == "downstream_unverified"
+
+
 def _create_lot_records(db: Session, identity: IdentityFixture, suffix: str):
     farm = Farm(
         organization_id=identity.organization_id,

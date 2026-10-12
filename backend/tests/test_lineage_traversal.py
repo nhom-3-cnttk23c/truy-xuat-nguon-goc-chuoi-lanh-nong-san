@@ -181,6 +181,7 @@ async def test_receiver_reads_sources_but_old_holder_history_is_cut_off(
 
 
 @pytest.mark.asyncio
+@pytest.mark.performance
 async def test_thousand_node_chain_is_complete_and_under_two_seconds(
     lineage, admin_session
 ):
@@ -259,9 +260,7 @@ def test_detail_uses_three_queries_with_runtime_role(lineage, admin_session):
             result = get_detail(db, principal, root.id)
             assert result["id"] == root.id
             assert result["event_count"] == 0
-            assert not any(
-                "WITH RECURSIVE" in statement.upper() for statement in statements
-            )
+            assert str(root.farm_id) in {farm["id"] for farm in result["root_farms"]}
             assert len(statements) == 3, statements
         finally:
             event.remove(connection, "before_cursor_execute", record_statement)

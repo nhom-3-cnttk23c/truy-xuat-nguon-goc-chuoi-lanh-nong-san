@@ -73,6 +73,8 @@ class IntegrityCheckRead(IntegrityRead):
 class EventHistoryRead(BaseModel):
     events: list[EventRead]
     integrity: IntegrityRead
+    next_cursor: int | None = None
+    total: int = Field(ge=0)
 
 
 # ARCHITECTURAL INVARIANT (N3-21):

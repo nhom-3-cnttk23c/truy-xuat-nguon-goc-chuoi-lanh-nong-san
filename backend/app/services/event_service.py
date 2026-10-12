@@ -1,10 +1,11 @@
 """Event service implementing append-only event logging with SHA-256 hash chaining."""
 
+from collections.abc import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import Principal
 from app.core.crypto import GENESIS_PREV_HASH, compute_event_hash
@@ -190,21 +191,39 @@ def list_events(
     return readable_events(db, principal, list(db.scalars(statement).all()))
 
 
-def verify_event_chain(events: list[Event]) -> dict:
+def verify_event_chain(events: Iterable[Event]) -> dict:
     """Recompute a lot's complete chain in memory and identify the first break."""
     expected_previous_hash = GENESIS_PREV_HASH
     expected_sequence = 1
     issues: list[IntegrityIssue] = []
     invalid_sequence: int | None = None
+    count = 0
 
     for event in events:
+        count += 1
+        if invalid_sequence is not None:
+            if event.sequence_number > invalid_sequence:
+                issues.append(
+                    IntegrityIssue(
+                        sequence_number=event.sequence_number,
+                        kind="downstream_unverified",
+                    )
+                )
+            continue
         if event.sequence_number != expected_sequence:
             missing_at = min(event.sequence_number, expected_sequence)
             issues.append(
                 IntegrityIssue(sequence_number=missing_at, kind="missing_event")
             )
             invalid_sequence = missing_at
-            break
+            if event.sequence_number > missing_at:
+                issues.append(
+                    IntegrityIssue(
+                        sequence_number=event.sequence_number,
+                        kind="downstream_unverified",
+                    )
+                )
+            continue
 
         if event.prev_hash != expected_previous_hash:
             issues.append(
@@ -214,7 +233,7 @@ def verify_event_chain(events: list[Event]) -> dict:
                 )
             )
             invalid_sequence = event.sequence_number
-            break
+            continue
 
         event_content = {
             "event_type": event.event_type,
@@ -232,42 +251,55 @@ def verify_event_chain(events: list[Event]) -> dict:
                 )
             )
             invalid_sequence = event.sequence_number
-            break
+            continue
 
         expected_previous_hash = event.event_hash
         expected_sequence += 1
 
-    if invalid_sequence is not None:
-        issues.extend(
-            IntegrityIssue(
-                sequence_number=event.sequence_number,
-                kind="downstream_unverified",
-            )
-            for event in events
-            if event.sequence_number > invalid_sequence
-        )
-
     return {
         "valid": not issues,
-        "checked_events": len(events),
+        "checked_events": count,
         "first_invalid_sequence": invalid_sequence,
         "issues": issues,
     }
 
 
-def get_event_history(db: Session, principal: Principal, lot_id: UUID) -> dict:
-    """Return a chronological timeline and its integrity result in one event query."""
+def get_event_history(
+    db: Session,
+    principal: Principal,
+    lot_id: UUID,
+    *,
+    after: int = 0,
+    page_size: int = 500,
+) -> dict:
+    """Stream full verification in one event query, retain only the requested page."""
     get_tenant_record(db, Lot, lot_id, principal, allow_historical=True)
-    events = list(
-        db.scalars(
-            select(Event)
-            .where(Event.lot_id == lot_id)
-            .order_by(Event.sequence_number.asc())
-        ).all()
+    statement = (
+        select(Event)
+        .options(joinedload(Event.organization))
+        .where(Event.lot_id == lot_id)
+        .order_by(Event.sequence_number.asc())
+        .execution_options(yield_per=100)
     )
+    events = []
+    has_more = False
+
+    def full_chain():
+        nonlocal has_more
+        for event in db.scalars(statement):
+            if event.sequence_number > after:
+                if len(events) < page_size:
+                    events.append(event)
+                else:
+                    has_more = True
+            yield event
+
+    integrity = verify_event_chain(full_chain())
     return {
         "events": readable_events(db, principal, events),
-        "integrity": verify_event_chain(events),
+        "integrity": integrity,
+        "next_cursor": events[-1].sequence_number if events and has_more else None,
+        "total": integrity["checked_events"],
     }
 
 

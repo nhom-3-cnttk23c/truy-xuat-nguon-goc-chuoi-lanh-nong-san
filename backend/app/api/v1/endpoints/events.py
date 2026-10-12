@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.auth import Principal, get_current_principal
@@ -26,8 +26,12 @@ def get_lot_history(
     lot_id: UUID,
     principal: Annotated[Principal, Depends(get_current_principal)],
     db: Annotated[Session, Depends(get_db)],
+    after: Annotated[int, Query(ge=0)] = 0,
+    page_size: Annotated[int, Query(ge=1, le=500)] = 500,
 ) -> dict:
-    return event_service.get_event_history(db, principal, lot_id)
+    return event_service.get_event_history(
+        db, principal, lot_id, after=after, page_size=page_size
+    )
 
 
 @router.get("/lots/{lot_id}/integrity", response_model=IntegrityRead)

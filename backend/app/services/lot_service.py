@@ -143,11 +143,20 @@ def list_lots(
                 )
             )
 
+    # Limit before eager-loading product/holder/location. Otherwise PostgreSQL
+    # may evaluate tenant-protected joins for thousands of rows before sorting.
+    page = (
+        statement.with_only_columns(Lot.id)
+        .order_by(Lot.harvested_on.desc().nulls_last(), Lot.id.desc())
+        .limit(page_size + 1)
+        .cte("lot_page")
+        .prefix_with("MATERIALIZED")
+    )
     fetched = list(
         db.scalars(
-            statement.order_by(
-                Lot.harvested_on.desc().nulls_last(), Lot.id.desc()
-            ).limit(page_size + 1)
+            select(Lot)
+            .join(page, page.c.id == Lot.id)
+            .order_by(Lot.harvested_on.desc().nulls_last(), Lot.id.desc())
         ).all()
     )
     has_more = len(fetched) > page_size

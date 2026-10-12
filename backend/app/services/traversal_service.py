@@ -148,8 +148,24 @@ def get_detail(db: Session, principal: Principal, lot_id: UUID) -> dict:
         .where(Event.lot_id == lot_id)
         .scalar_subquery()
     )
+    sources = (
+        select(Lot.id, Lot.farm_id)
+        .where(Lot.id == lot_id)
+        .cte("detail_sources", recursive=True)
+    )
+    sources = sources.union(
+        select(Lot.id, Lot.farm_id)
+        .join(LotRelation, LotRelation.parent_lot_id == Lot.id)
+        .join(sources, sources.c.id == LotRelation.child_lot_id)
+    )
+    root_farms = (
+        select(func.jsonb_agg(func.to_jsonb(Farm.__table__.table_valued())))
+        .select_from(Farm)
+        .where(Farm.id.in_(select(sources.c.farm_id)))
+        .scalar_subquery()
+    )
     rows = db.execute(
-        select(Lot, Farm, lot_is_historical(Lot, principal), event_count)
+        select(Lot, Farm, lot_is_historical(Lot, principal), event_count, root_farms)
         .outerjoin(Farm, Farm.id == Lot.farm_id)
         .where(Lot.id.in_(ids))
         .order_by(Lot.id)
@@ -159,7 +175,8 @@ def get_detail(db: Session, principal: Principal, lot_id: UUID) -> dict:
     nodes = {}
     farms = {}
     count = 0
-    for lot, farm, historical, visible_event_count in rows:
+    origins = []
+    for lot, farm, historical, visible_event_count, origin_farms in rows:
         node = LotRead.model_validate(lot).model_dump()
         node["historical_only"] = historical
         if historical:
@@ -176,6 +193,7 @@ def get_detail(db: Session, principal: Principal, lot_id: UUID) -> dict:
             farms[farm.id] = farm
         if lot.id == lot_id:
             count = visible_event_count
+            origins = origin_farms or []
     return {
         **LotRead.model_validate(nodes[lot_id]).model_dump(),
         "parents": [
@@ -185,5 +203,6 @@ def get_detail(db: Session, principal: Principal, lot_id: UUID) -> dict:
             nodes[edge.child_lot_id] for edge in edges if edge.parent_lot_id == lot_id
         ],
         "direct_farms": list(farms.values()),
+        "root_farms": origins,
         "event_count": count,
     }
