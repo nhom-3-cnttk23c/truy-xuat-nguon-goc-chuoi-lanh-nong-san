@@ -31,12 +31,6 @@ function resolveBaseUrl(): string {
   if (import.meta.env.DEV) {
     return ''
   }
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname.endsWith('.onrender.com')
-  ) {
-    return 'https://ttcs-backend-staging.onrender.com'
-  }
   return 'https://ttcs-backend-staging.onrender.com'
 }
 
@@ -164,7 +158,6 @@ export async function request<T>(
         '/handovers',
         '/products',
         '/farms',
-        '/products',
         '/security',
         '/integrity',
       ])
@@ -281,7 +274,7 @@ export const createProduct = (payload: ProductPayload) =>
     body: JSON.stringify(payload),
   })
 
-export const updateProduct = (productId: string, payload: ProductPayload) =>
+export const updateProduct = (productId: string, payload: Partial<ProductPayload>) =>
   request<Product>(`/api/v1/products/${productId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
@@ -317,9 +310,6 @@ export const createLot = (payload: LotPayload) =>
     body: JSON.stringify(payload),
   })
 
-export const getFarm = (farmId: string) =>
-  request<Farm>(`/api/v1/farms/${farmId}`)
-
 export const createFarm = (payload: FarmPayload) =>
   request<Farm>('/api/v1/farms/', {
     method: 'POST',
@@ -332,11 +322,6 @@ export const updateFarm = (farmId: string, payload: FarmPayload) =>
     body: JSON.stringify(payload),
   })
 
-export const getEvents = (lotId?: string) => {
-  const query = lotId ? `?lot_id=${encodeURIComponent(lotId)}` : ''
-  return request<LotEvent[]>(`/api/v1/events/${query}`)
-}
-
 export const verifyLotIntegrity = (lotId: string) =>
   request<IntegrityCheckRecord>(`/api/v1/events/lots/${lotId}/integrity-checks`, {
     method: 'POST',
@@ -347,9 +332,6 @@ export const getIntegrityCheckHistory = (lotId: string) =>
 
 export const getLotHistory = (lotId: string, after = 0) =>
   request<EventHistory>(`/api/v1/events/lots/${lotId}/history?page_size=10&after=${after}`)
-
-export const getEvent = (eventId: string) =>
-  request<LotEvent>(`/api/v1/events/${eventId}`)
 
 export const createEvent = (payload: CreateEventRequest) =>
   request<LotEvent>('/api/v1/events/', {

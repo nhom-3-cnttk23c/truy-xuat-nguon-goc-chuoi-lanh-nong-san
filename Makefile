@@ -13,7 +13,7 @@ help:
 
 install:
 	cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt
-	cd frontend && npm install
+	cd frontend && npm ci
 
 dev-backend:
 	cd backend && .venv/Scripts/python -m app.startup

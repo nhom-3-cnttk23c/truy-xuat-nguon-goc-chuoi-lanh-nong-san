@@ -1,32 +1,11 @@
-# React + TypeScript + Vite
+# Frontend AgroChain
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React, TypeScript và Vite. Hướng dẫn chạy: [README](../README.md); trình diễn: [UX-DEMO](../docs/UX-DEMO.md).
 
-Currently, two official plugins are available:
+Chạy `npm ci`, đặt `VITE_BACKEND_TARGET=http://127.0.0.1:8000` cho API local rồi `npm run dev`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`VITE_BACKEND_TARGET` dùng cho proxy dev; `VITE_API_BASE_URL` dùng khi build/deploy. Chỉ đặt địa chỉ API công khai, không đưa mật khẩu/token vào biến Vite.
 
-## React Compiler
+Kiểm tra: `npm test`, `npm run lint`, `npm run build`, `npm audit`. Test HTML chạy offline; nghiệm thu giao diện tương tác cần thực hiện riêng.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Không commit `node_modules/`, `dist/`, cache hoặc `.env`. Dùng hàm API và kiểu dữ liệu chung trong `src/services/api.ts` và `src/types/index.ts`, tránh lớp gọi API trùng.

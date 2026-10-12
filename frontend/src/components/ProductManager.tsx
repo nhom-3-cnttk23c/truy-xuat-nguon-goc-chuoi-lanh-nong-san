@@ -1,14 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { hasPermission, type SessionUser } from '../types'
+import { hasPermission, type SessionUser, type Product, type ProductPayload, type ProductUnit } from '../types'
 import { CsvImportPanel } from './CsvImportPanel'
 import { TaskLink } from './TaskLink'
 import { EditDialog } from './EditDialog'
-import {
-  productService,
-  type Product,
-  type ProductInput,
-  type ProductUnit,
-} from '../services/productService'
+import { getProducts, createProduct, updateProduct } from '../services/api'
 
 const PRODUCT_UNITS: { value: ProductUnit; label: string }[] = [
   { value: 'kg', label: 'Kilôgam (kg)' },
@@ -44,8 +39,7 @@ export function ProductManager({ user }: ProductManagerProps) {
 
   useEffect(() => {
     let active = true
-    productService
-      .getProducts()
+    getProducts()
       .then((data) => {
         if (active) {
           setProducts(data); setLoadError(null)
@@ -106,7 +100,7 @@ export function ProductManager({ user }: ProductManagerProps) {
 
     setSaving(true)
     setFeedback(null)
-    const payload: ProductInput = {
+    const payload: ProductPayload = {
       name: trimmedName,
       unit,
       description: description.trim() || undefined,
@@ -116,8 +110,8 @@ export function ProductManager({ user }: ProductManagerProps) {
 
     try {
       const saved = editingProduct
-        ? await productService.updateProduct(editingProduct.id, payload)
-        : await productService.createProduct(payload)
+        ? await updateProduct(editingProduct.id, payload)
+        : await createProduct(payload)
       setProducts((current) => {
         const next = editingProduct
           ? current.map((product) =>
