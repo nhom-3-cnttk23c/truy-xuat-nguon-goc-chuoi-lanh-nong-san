@@ -167,7 +167,7 @@ export function LotDetailPanel({
               <div><dt>Khối lượng ban đầu</dt><dd>{lot.quantity ?? '—'} {lot.product?.unit ?? ''}</dd></div>
               <div><dt>Còn lại</dt><dd>{lot.remaining_quantity} {lot.product?.unit ?? ''}</dd></div>
               <div><dt>Địa điểm hiện tại</dt><dd>{lot.current_location ? <>{lot.current_location.name}<br />{lot.current_location.address}</> : 'Chưa gán địa điểm'}</dd></div>
-              <div><dt>Mã vùng trồng</dt><dd><code>{lot.farm_id?.slice(0, 8) ?? 'Theo các lô nguồn'}</code></dd></div>
+              <div><dt>Vùng trồng gốc</dt><dd>{(lot.root_farms ?? lot.direct_farms).map(farm => farm.name).join(', ') || 'Chưa có thông tin vùng trồng'}</dd></div>
             </dl>
           </section>
 
@@ -200,7 +200,7 @@ export function LotDetailPanel({
                 {lot.current_holder_organization_id !== organizationId && <p>Bạn đang xem thông tin. Đơn vị đang giữ lô mới có thể thực hiện thao tác.</p>}
                 {handover && <p>Bàn giao gần nhất: {handoverLabel(handover.status)} · {handover.from_organization_name} → {handover.to_organization_name}{handover.overdue_at && handover.status === 'pending' ? ' · Quá hạn xác nhận' : ''}</p>}
               </section>}
-              {view === 'history' && history && <section className="panel-card panel-box"><EventTimeline events={history.events} lotName={displayLotCode(lot)} loading={false} integrity={history.integrity} /></section>}
+              {view === 'history' && history && <section className="panel-card panel-box"><EventTimeline key={lot.id} lotId={lot.id} nextCursor={history.next_cursor} events={history.events} lotName={displayLotCode(lot)} loading={false} integrity={history.integrity} /></section>}
               {view === 'origins' && <>
           <section className="panel-card panel-box" aria-label="Nguồn gốc và quan hệ trực tiếp">
             <h2>Nguồn gốc và quan hệ</h2>

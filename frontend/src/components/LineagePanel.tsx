@@ -2,31 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Background, Controls, Position, ReactFlow, type Edge, type Node } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { getLineage, getLotHistory } from '../services/api'
-import type { Lineage, GraphLot, LotRelation, EventHistory } from '../types'
+import dagre from '@dagrejs/dagre'
+import type { Lineage, GraphLot, EventHistory } from '../types'
 import { EventTimeline } from './EventTimeline'
 import { lotStatusLabel } from '../types'
 
 interface Props { lotId: string; onOpenLot: (id: string) => void }
-
-function distances(id: string, edges: LotRelation[], ancestors: boolean): Map<string, number> {
-  const next = new Map<string, string[]>()
-  for (const edge of edges) {
-    const from = ancestors ? edge.child_lot_id : edge.parent_lot_id
-    const to = ancestors ? edge.parent_lot_id : edge.child_lot_id
-    next.set(from, [...(next.get(from) ?? []), to])
-  }
-  const result = new Map([[id, 0]])
-  const queue = [id]
-  for (let index = 0; index < queue.length; index++) {
-    for (const target of next.get(queue[index]) ?? []) {
-      const distance = result.get(queue[index])! + 1
-      if (distance > (result.get(target) ?? -1)) {
-        result.set(target, distance); queue.push(target)
-      }
-    }
-  }
-  return result
-}
 
 export function LineagePanel({ lotId, onOpenLot }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -59,8 +40,6 @@ export function LineagePanel({ lotId, onOpenLot }: Props) {
     const lotMap = new Map(data.flatMap(graph => graph.nodes).map(lot => [lot.id, lot]))
     const relationMap = new Map(data.flatMap(graph => graph.edges).map(edge => [edge.id, edge]))
     const relations = [...relationMap.values()]
-    const up = distances(lotId, data[0].edges, true)
-    const down = distances(lotId, data[1].edges, false)
     // Walking stops at a collapsed node, so shared descendants remain visible
     // through another expanded parent in a merge DAG.
     const visible = new Set([lotId])
@@ -83,15 +62,16 @@ export function LineagePanel({ lotId, onOpenLot }: Props) {
         }
       }
     }
-    const groups = new Map<number, GraphLot[]>()
-    for (const lot of lotMap.values()) {
-      if (!visible.has(lot.id)) continue
-      const level = lot.id === lotId ? 0 : up.has(lot.id) ? -up.get(lot.id)! : down.get(lot.id)!
-      groups.set(level, [...(groups.get(level) ?? []), lot])
-    }
-    const nodes: Node[] = []
-    for (const [level, group] of groups) group.forEach((lot, index) => nodes.push({
-      id: lot.id, position: {x: level * 300, y: (index - (group.length - 1) / 2) * 160},
+    const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+    layout.setGraph({rankdir: 'LR', nodesep: 60, ranksep: 90})
+    const visibleLots = [...lotMap.values()].filter(lot => visible.has(lot.id))
+    const visibleRelations = relations.filter(edge => visible.has(edge.parent_lot_id) && visible.has(edge.child_lot_id))
+    for (const lot of visibleLots) layout.setNode(lot.id, {width: 270, height: 220})
+    for (const edge of visibleRelations) layout.setEdge(edge.parent_lot_id, edge.child_lot_id)
+    dagre.layout(layout)
+    const center = layout.node(lotId)
+    const nodes: Node[] = visibleLots.map(lot => ({
+      id: lot.id, position: {x: layout.node(lot.id).x - center.x, y: layout.node(lot.id).y - center.y},
       sourcePosition: Position.Right, targetPosition: Position.Left,
       className: lot.id === lotId ? 'lineage-current' : '',
       data: {label: <div>
@@ -103,7 +83,7 @@ export function LineagePanel({ lotId, onOpenLot }: Props) {
         }}>{collapsed.has(lot.id) ? 'Mở nhánh' : 'Thu gọn nhánh'}</button>
       </div>},
     }))
-    return {nodes, edges: relations.filter(edge => visible.has(edge.parent_lot_id) && visible.has(edge.child_lot_id)).map(edge => ({
+    return {nodes, edges: visibleRelations.map(edge => ({
       id: edge.id, source: edge.parent_lot_id, target: edge.child_lot_id,
       label: `${edge.quantity} ${lotMap.get(edge.child_lot_id)?.product?.unit ?? ''}`,
       type: 'smoothstep',
@@ -138,7 +118,7 @@ export function LineagePanel({ lotId, onOpenLot }: Props) {
       </details>
       {historyLotId && <div className="panel-box">
         <button type="button" className="ds-button ds-button-secondary" onClick={() => setHistoryLotId(null)}>Đóng lịch sử nguồn</button>
-        {historyError ? <p role="alert">{historyError}</p> : <EventTimeline events={history?.events ?? []}
+        {historyError ? <p role="alert">{historyError}</p> : <EventTimeline key={historyLotId} lotId={historyLotId} nextCursor={history?.next_cursor} events={history?.events ?? []}
           integrity={history?.integrity} loading={!history} lotName={lots.find(lot => lot.id === historyLotId)?.lot_code ?? historyLotId.slice(0,8)} />}
       </div>}
     </>}

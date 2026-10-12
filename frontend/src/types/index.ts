@@ -110,6 +110,7 @@ export interface LotDetail extends Lot {
   parents: GraphLot[]
   children: GraphLot[]
   direct_farms: Farm[]
+  root_farms: Farm[]
   event_count: number
 }
 
@@ -210,6 +211,8 @@ export interface IntegrityCheckRecord extends IntegrityReport {
 export interface EventHistory {
   events: LotEvent[]
   integrity: IntegrityReport
+  next_cursor?: number | null
+  total?: number
 }
 
 export interface CreateEventRequest {

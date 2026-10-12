@@ -345,8 +345,8 @@ export const verifyLotIntegrity = (lotId: string) =>
 export const getIntegrityCheckHistory = (lotId: string) =>
   request<IntegrityCheckRecord[]>(`/api/v1/events/lots/${lotId}/integrity-checks`)
 
-export const getLotHistory = (lotId: string) =>
-  request<EventHistory>(`/api/v1/events/lots/${lotId}/history`)
+export const getLotHistory = (lotId: string, after = 0) =>
+  request<EventHistory>(`/api/v1/events/lots/${lotId}/history?page_size=10&after=${after}`)
 
 export const getEvent = (eventId: string) =>
   request<LotEvent>(`/api/v1/events/${eventId}`)

@@ -1,25 +1,48 @@
 import { useState } from 'react'
-import type { IntegrityReport, LotEvent } from '../types'
+import type { EventHistory, IntegrityReport, LotEvent } from '../types'
+import { getLotHistory } from '../services/api'
 
 interface EventTimelineProps {
   events: LotEvent[]
   lotName?: string
   loading?: boolean
   integrity?: IntegrityReport
+  lotId?: string
+  nextCursor?: number | null
 }
 
 export function EventTimeline({
   events,
   lotName,
   loading = false,
-  integrity,
+  integrity: initialIntegrity,
+  lotId,
+  nextCursor,
 }: EventTimelineProps) {
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const [copyError, setCopyError] = useState('')
   const [page, setPage] = useState(0)
-  const pageCount = Math.max(1, Math.ceil(events.length / 10))
+  const [remote, setRemote] = useState<EventHistory | null>(null)
+  const [cursors, setCursors] = useState([0])
+  const [requesting, setRequesting] = useState(false)
+  const [pageError, setPageError] = useState('')
+  const remotePaging = lotId !== undefined && nextCursor !== undefined
+  const displayedEvents = remote?.events ?? events
+  const followingCursor = remote ? remote.next_cursor : nextCursor
+  const displayedIntegrity = remote?.integrity ?? initialIntegrity
+  const integrity = displayedIntegrity
+  const pageCount = Math.max(1, Math.ceil(displayedEvents.length / 10))
   const currentPage = Math.min(page, pageCount - 1)
-  const visibleEvents = events.slice(currentPage * 10, currentPage * 10 + 10)
+  const visibleEvents = displayedEvents.slice(currentPage * 10, currentPage * 10 + 10)
+  const requestPage = async (next: number[]) => {
+    if (!lotId || requesting) return
+    setRequesting(true); setPageError('')
+    try {
+      const result = await getLotHistory(lotId, next[next.length - 1])
+      setRemote(result); setCursors(next); setPage(0)
+    } catch { setPageError('Không tải được trang sự kiện. Bạn có thể thử lại.') }
+    finally { setRequesting(false) }
+  }
 
   const handleCopyHash = async (hash: string) => {
     setCopyError('')
@@ -121,8 +144,8 @@ export function EventTimeline({
               margin: '0.25rem 0 0 0',
             }}
           >
-            {integrity
-              ? `Đã kiểm tra ${integrity.checked_events} sự kiện trong chuỗi hash.`
+            {displayedIntegrity
+              ? `Đã kiểm tra ${displayedIntegrity.checked_events} sự kiện trong chuỗi hash.`
               : `${events.length} sự kiện đã được ghi nhận.`}
           </p>
         </div>
@@ -162,7 +185,7 @@ export function EventTimeline({
         </div>
       )}
 
-      {!loading && events.length === 0 && (
+      {!loading && displayedEvents.length === 0 && (
         <div
           style={{
             padding: '2rem',
@@ -177,7 +200,7 @@ export function EventTimeline({
         </div>
       )}
 
-      {!loading && events.length > 0 && (
+      {!loading && displayedEvents.length > 0 && (
         <div
           style={{
             position: 'relative',
@@ -403,7 +426,13 @@ export function EventTimeline({
         </div>
       )}
       {copyError && <p role="alert">{copyError}</p>}
-      {!loading && pageCount > 1 && <div className="lot-pagination">
+      {pageError && <p role="alert">{pageError}</p>}
+      {!loading && remotePaging && <div className="lot-pagination" aria-busy={requesting}>
+        <span>Trang {cursors.length} · tối đa 10 sự kiện mỗi trang</span>
+        <button type="button" className="ds-button ds-button-secondary" disabled={requesting || cursors.length === 1} onClick={() => requestPage(cursors.slice(0, -1))}>Sự kiện trước</button>
+        <button type="button" className="ds-button ds-button-secondary" disabled={requesting || followingCursor == null} onClick={() => requestPage([...cursors, followingCursor!])}>Sự kiện tiếp</button>
+      </div>}
+      {!loading && !remotePaging && pageCount > 1 && <div className="lot-pagination">
         <span>Trang {currentPage + 1}/{pageCount} · tối đa 10 sự kiện mỗi trang</span>
         <button type="button" className="ds-button ds-button-secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Sự kiện trước</button>
         <button type="button" className="ds-button ds-button-secondary" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>Sự kiện tiếp</button>

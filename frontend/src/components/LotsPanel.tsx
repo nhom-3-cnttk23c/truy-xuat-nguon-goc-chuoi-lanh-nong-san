@@ -37,7 +37,7 @@ export function LotsPanel({ canReadLots, canCreateLots, canReadEvents = true, ca
     if (!canReadLots || task === 'create') return
     let active = true
     const timer = window.setTimeout(() => {
-      getLots({ q: query.trim(), product_id: productId || undefined, cursor, page_size: 10 })
+      getLots({ q: query.trim(), product_id: productId || undefined, cursor, page_size: 20 })
         .then(page => { if (active) { setLots(page.items); setNextCursor(page.next_cursor) } })
         .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : 'Không tải được danh sách lô.') })
         .finally(() => { if (active) setLoading(false) })
@@ -63,7 +63,7 @@ export function LotsPanel({ canReadLots, canCreateLots, canReadEvents = true, ca
     </div>
     <div className="lot-filter-row">
       <label className="form-field">Tìm theo mã lô<input type="search" value={query} onChange={event => { resetPage(); setQuery(event.target.value) }} placeholder="Nhập mã lô cần tìm" /></label>
-      <label className="form-field">Sản phẩm<select value={productId} disabled={loadingProducts} onChange={event => { resetPage(); setProductId(event.target.value) }}><option value="">Tất cả sản phẩm</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+      <label className="form-field">Sản phẩm<select value={productId} disabled={loadingProducts} onChange={event => { resetPage(); setSelected([]); setProductId(event.target.value) }}><option value="">Tất cả sản phẩm</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
     </div>
     {canTransform && <div className="selection-bar">
       <p>{selected.length ? `Đã chọn ${selected.length} lô. Chỉ gộp lô cùng sản phẩm do đơn vị của bạn đang giữ.` : 'Để gộp lô, tích chọn ít nhất hai lô cùng sản phẩm.'}</p>
@@ -78,7 +78,10 @@ export function LotsPanel({ canReadLots, canCreateLots, canReadEvents = true, ca
         const selectedHere = selected.some(item => item.id === lot.id)
         const reason = lot.current_holder_organization_id !== organizationId ? 'Đơn vị của bạn không giữ lô này' : lot.status !== 'active' || Number(lot.remaining_quantity) <= 0 ? 'Lô không còn lượng khả dụng' : selected.length && selected[0].product_id !== lot.product_id ? 'Sản phẩm khác với lô đã chọn' : selected.length >= 100 && !selectedHere ? 'Tối đa 100 lô mỗi lần gộp' : ''
         return <tr key={lot.id}>
-          {canTransform && <td data-label="Chọn" title={reason}><input type="checkbox" aria-label={`Chọn ${code}${reason ? `: ${reason}` : ''}`} checked={selectedHere} disabled={!!reason && !selectedHere} onChange={event => setSelected(current => event.target.checked ? [...current, lot] : current.filter(item => item.id !== lot.id))} />{reason && !selectedHere && <small className="panel-sub">{reason}</small>}</td>}
+          {canTransform && <td data-label="Chọn" title={reason}><input type="checkbox" aria-label={`Chọn ${code}${reason ? `: ${reason}` : ''}`} checked={selectedHere} disabled={!!reason && !selectedHere} onChange={event => {
+            if (event.target.checked && selected.length === 0) { resetPage(); setProductId(lot.product_id ?? '') }
+            setSelected(current => event.target.checked ? [...current, lot] : current.filter(item => item.id !== lot.id))
+          }} />{reason && !selectedHere && <small className="panel-sub">{reason}</small>}</td>}
           <th scope="row" data-label="Nông sản"><a className="lot-code-link" href={`/lots/${lot.id}`} onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0) {event.preventDefault(); onOpenLot(lot.id)} }}>{lot.product?.name ?? lot.name}</a></th>
           <td data-label="Mã truy xuất"><code>{code}</code></td><td data-label="Ngày thu hoạch">{lot.harvested_on ?? 'Lô dẫn xuất'}</td><td data-label="Còn lại">{lot.remaining_quantity} {lot.product?.unit}</td><td data-label="Trạng thái">{lotStatusLabel(lot.status)}</td><td data-label="Địa điểm">{lot.current_location?.name ?? 'Chưa gán địa điểm'}</td>
           {canReadEvents && <td data-label="Lịch sử"><a href={`/lots/${lot.id}?view=history`} className="ds-button ds-button-secondary">Xem lịch sử</a></td>}
