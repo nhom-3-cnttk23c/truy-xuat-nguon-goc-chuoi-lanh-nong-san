@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -114,6 +114,12 @@ def split_lot(
     db: Session, principal: Principal, lot_id: UUID, payload: LotSplit
 ) -> dict:
     try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext('split:' || :parent_id))"),
+                {"parent_id": str(lot_id)},
+            )
         parent = _lock_parents(db, principal, [lot_id])[lot_id]
         validate_locations(
             db,

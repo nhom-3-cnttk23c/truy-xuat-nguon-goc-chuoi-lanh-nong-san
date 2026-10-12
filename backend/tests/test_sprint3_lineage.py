@@ -1,5 +1,6 @@
 """Sprint 3 transformations must preserve mass, custody and atomic event chains."""
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from threading import Barrier
@@ -351,3 +352,82 @@ async def test_merge_rejects_repeated_parent_without_consuming_twice(
         )
     assert response.status_code == 422, response.text
     assert_mass(admin_session, parent.id, "40")
+
+
+@pytest.mark.asyncio
+async def test_n340_split_fifty_from_forty_fails_with_remaining_notice(
+    lineage, admin_session
+):
+    """N3-40 AC1: Giả sử lô mẹ còn 40 kg, Khi tách với tổng 50 kg, Thì bị chặn kèm thông báo nêu phần còn lại."""
+    owner, products, _ = lineage
+    parent = add_lot(admin_session, owner, products[0])
+    async with client() as api:
+        await login(api, owner)
+        response = await api.post(
+            f"/api/v1/lots/{parent.id}/split", json=split_body("50")
+        )
+    assert response.status_code == 409, response.text
+    error_detail = response.json()["detail"]
+    assert "chỉ còn 40.000" in error_detail
+    assert "vượt quá lượng còn lại" in error_detail
+    assert_mass(admin_session, parent.id, "40")
+
+
+@pytest.mark.asyncio
+async def test_n340_concurrent_split_pytest_asyncio_two_connections(
+    lineage, admin_session
+):
+    """N3-40 AC2 & Image 2: Stress test với pytest-asyncio + 2 connections song song trên cùng parent."""
+    owner, products, _ = lineage
+    parent = add_lot(admin_session, owner, products[0])
+    async with client() as api1, client() as api2:
+        await login(api1, owner)
+        await login(api2, owner)
+
+        res1, res2 = await asyncio.gather(
+            api1.post(f"/api/v1/lots/{parent.id}/split", json=split_body("30")),
+            api2.post(f"/api/v1/lots/{parent.id}/split", json=split_body("30")),
+        )
+
+    statuses = sorted([res1.status_code, res2.status_code])
+    assert statuses == [201, 409], f"res1: {res1.text}, res2: {res2.text}"
+
+    failed_response = res1 if res1.status_code == 409 else res2
+    assert "chỉ còn 10.000" in failed_response.text
+    assert "vượt quá lượng còn lại" in failed_response.text
+
+    # Parent lot remaining must be exactly 10 kg
+    assert_mass(admin_session, parent.id, "10.000")
+
+
+@pytest.mark.asyncio
+async def test_n340_successive_splits_mass_conservation_exact_to_gram(
+    lineage, admin_session
+):
+    """N3-40 AC3: Tách nhiều lần liên tiếp, tổng khối lượng mọi lô con bằng đúng khối lượng đã trừ khỏi lô mẹ, không lệch một gram."""
+    owner, products, _ = lineage
+    parent = add_lot(admin_session, owner, products[0])  # 40.000 kg
+    splits = [
+        ("12.345", "27.655", "active"),
+        ("7.655", "20.000", "active"),
+        ("20.000", "0.000", "closed"),
+    ]
+    all_children_quantities: list[Decimal] = []
+
+    async with client() as api:
+        await login(api, owner)
+        for split_amount, expected_parent_remaining, expected_status in splits:
+            response = await api.post(
+                f"/api/v1/lots/{parent.id}/split", json=split_body(split_amount)
+            )
+            assert response.status_code == 201, response.text
+            created_child = response.json()["children"][0]
+            child_qty = Decimal(str(created_child["quantity"]))
+            all_children_quantities.append(child_qty)
+            assert_mass(
+                admin_session, parent.id, expected_parent_remaining, expected_status
+            )
+
+    # Tổng mọi lô con = đúng 40.000 kg, không lệch một gram
+    assert sum(all_children_quantities) == Decimal("40.000")
+    assert_mass(admin_session, parent.id, "0.000", "closed")
