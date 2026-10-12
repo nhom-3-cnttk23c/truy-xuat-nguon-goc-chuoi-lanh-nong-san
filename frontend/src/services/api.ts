@@ -194,7 +194,7 @@ export async function request<T>(
 }
 
 export const checkHealth = () =>
-  request<HealthResponse>(API_BASE_URL ? '/' : '/health')
+  request<HealthResponse>('/health')
 
 export const login = (payload: LoginRequest) =>
   request<SessionUser>('/api/v1/auth/login', {

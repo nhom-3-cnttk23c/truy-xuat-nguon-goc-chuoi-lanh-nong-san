@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 12
 
     steps:
-      - name: Wait for Sprint 2 API routes to be deployed
+      - name: Verify readiness, release SHA and Sprint 1–4 routes
         env:
           OPENAPI_URL: https://ttcs-backend-staging.onrender.com/openapi.json
           EXPECTED_COMMIT: ${{ github.sha }}
