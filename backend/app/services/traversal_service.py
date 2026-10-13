@@ -68,10 +68,14 @@ def get_lineage(
     join_column = "child_lot_id" if ancestors else "parent_lot_id"
     # Column names are chosen above; all external values are bound parameters.
     condition = " OR parent_lot_id = :lot_id" if direction == "detail" else ""
-    statement = text(f"""WITH RECURSIVE walk(id) AS (
+    # Materialize caller-visible edges once. Otherwise a long chain can scan
+    # the base table and evaluate relation RLS again at every recursive level.
+    statement = text(f"""WITH RECURSIVE visible_edges AS MATERIALIZED (
+      SELECT * FROM lot_relations
+    ), walk(id) AS (
       SELECT CAST(:lot_id AS uuid)
-      UNION SELECT r.{next_column} FROM lot_relations r JOIN walk w ON r.{join_column} = w.id
-    ) SELECT * FROM lot_relations WHERE parent_lot_id IN (SELECT id FROM walk)
+      UNION SELECT r.{next_column} FROM visible_edges r JOIN walk w ON r.{join_column} = w.id
+    ) SELECT * FROM visible_edges WHERE parent_lot_id IN (SELECT id FROM walk)
       AND child_lot_id IN (SELECT id FROM walk){condition}
     """)
     cache_key = (

@@ -336,6 +336,17 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
         ]
         assert organization_scans
         assert all(node["Actual Loops"] <= 1 for node in organization_scans)
+        sql, parameters = next(item for item in captured if "WITH RECURSIVE" in item[0])
+        edge_plan = connection.exec_driver_sql(
+            "EXPLAIN (ANALYZE, FORMAT JSON) " + sql, parameters
+        ).scalar()[0]["Plan"]
+        edge_scans = [
+            node
+            for node in plan_nodes(edge_plan)
+            if node.get("Relation Name") == "lot_relations"
+        ]
+        assert edge_scans
+        assert all(node["Actual Loops"] <= 1 for node in edge_scans)
 
 
 def test_detail_uses_three_queries_with_runtime_role(lineage, admin_session):
