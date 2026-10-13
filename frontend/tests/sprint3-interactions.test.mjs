@@ -9,6 +9,7 @@ import React, { act } from 'react'
 // no browser, API or HTTP listener is started. This does not verify layout.
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://test.local/lots', pretendToBeVisual: true})
 for (const key of ['window', 'document', 'HTMLElement', 'HTMLDivElement', 'SVGElement', 'Element', 'Node', 'Event', 'MouseEvent', 'sessionStorage', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame']) globalThis[key] = dom.window[key]
+Object.defineProperty(globalThis, 'navigator', {value: dom.window.navigator, configurable: true})
 globalThis.ResizeObserver = dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { createRoot } = await import('react-dom/client')
