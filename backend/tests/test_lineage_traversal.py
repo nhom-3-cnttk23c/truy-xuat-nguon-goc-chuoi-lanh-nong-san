@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import event, text
 
 from app.core.auth import Principal
-from app.core.database import SessionLocal, set_db_context
+from app.core.database import SessionLocal, engine, set_db_context
 from app.models.lot import Lot
 from app.models.lot_relation import LotRelation
 from app.services.traversal_service import get_detail, get_lineage
@@ -227,15 +227,67 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
     async with client() as api:
         await login(api, owner)
         for target, direction in [(root, "descendants"), (children[-1], "ancestors")]:
+            queries = []
+
+            def before_query(conn, cur, sql, parameters, context, many):
+                context.lineage_started = perf_counter()
+
+            def after_query(conn, cur, sql, parameters, context, many, captured=queries):
+                captured.append(
+                    (perf_counter() - context.lineage_started, sql, parameters)
+                )
+
+            event.listen(engine, "before_cursor_execute", before_query)
+            event.listen(engine, "after_cursor_execute", after_query)
             started = perf_counter()
-            result = await api.get(
-                f"/api/v1/lots/{target.id}/lineage?direction={direction}"
-            )
+            try:
+                result = await api.get(
+                    f"/api/v1/lots/{target.id}/lineage?direction={direction}"
+                )
+            finally:
+                event.remove(engine, "before_cursor_execute", before_query)
+                event.remove(engine, "after_cursor_execute", after_query)
             elapsed = perf_counter() - started
             print(f"1000 nodes {direction}: {elapsed:.3f}s")
             assert result.status_code == 200, result.text
             assert len(result.json()["nodes"]) == 1000
             assert len(result.json()["edges"]) == 999
+            if elapsed >= 2:
+                with SessionLocal() as db:
+                    set_db_context(db, session_token_hash=owner.session_token_hash)
+                    for duration, sql, parameters in queries:
+                        print(f"Query {duration:.3f}s: {sql[:100]}")
+                        if duration < 0.1 or (
+                            "lot_relations" not in sql and "FROM lots" not in sql
+                        ):
+                            continue
+                        report = (
+                            db.connection()
+                            .exec_driver_sql(
+                                "EXPLAIN (ANALYZE, FORMAT JSON) " + sql, parameters
+                            )
+                            .scalar()[0]
+                        )
+                        print(
+                            {key: report.get(key) for key in ("Execution Time", "JIT")}
+                        )
+
+                        def summarize(node):
+                            print(
+                                {
+                                    key: node.get(key)
+                                    for key in (
+                                        "Node Type",
+                                        "Relation Name",
+                                        "Actual Total Time",
+                                        "Actual Loops",
+                                    )
+                                }
+                            )
+                            for child in node.get("Plans", []):
+                                summarize(child)
+
+                        summarize(report["Plan"])
             assert elapsed < 2, f"{direction}: {elapsed:.3f}s"
 
     # Independently reproduce the nested-loop plan that repeats organization
