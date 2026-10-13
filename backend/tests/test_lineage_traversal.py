@@ -232,7 +232,9 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
             def before_query(conn, cur, sql, parameters, context, many):
                 context.lineage_started = perf_counter()
 
-            def after_query(conn, cur, sql, parameters, context, many, captured=queries):
+            def after_query(
+                conn, cur, sql, parameters, context, many, captured=queries
+            ):
                 captured.append(
                     (perf_counter() - context.lineage_started, sql, parameters)
                 )
