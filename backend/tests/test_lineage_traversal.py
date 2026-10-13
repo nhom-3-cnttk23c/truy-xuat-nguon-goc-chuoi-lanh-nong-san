@@ -306,19 +306,30 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
     with SessionLocal() as db:
         set_db_context(db, session_token_hash=owner.session_token_hash)
         connection = db.connection()
-        connection.execute(text("SET LOCAL enable_hashjoin = off"))
-        connection.execute(text("SET LOCAL enable_mergejoin = off"))
-        connection.execute(text("SET LOCAL enable_material = off"))
+        default_jit = connection.scalar(text("SHOW jit"))
+        # Also exercise hosts that select expensive JIT plans for nested RLS
+        # functions; set this only after constructing the graph fixture.
+        connection.execute(text("SET LOCAL jit = on"))
+        connection.execute(text("SET LOCAL jit_above_cost = 0"))
+        connection.execute(text("SET LOCAL jit_inline_above_cost = 0"))
+        connection.execute(text("SET LOCAL jit_optimize_above_cost = 0"))
         captured = []
 
         def capture(conn, cur, statement, parameters, context, many):
             captured.append((statement, parameters))
 
         event.listen(connection, "before_cursor_execute", capture)
+        probe_started = perf_counter()
         try:
             get_lineage(db, principal, root.id, "descendants")
         finally:
             event.remove(connection, "before_cursor_execute", capture)
+        probe_elapsed = perf_counter() - probe_started
+        print(f"1000 nodes, JIT host settings: {probe_elapsed:.3f}s")
+        assert probe_elapsed < 2
+        # Inspect the nested-loop plans separately from the API/JIT timings.
+        connection.execute(text("SET LOCAL enable_hashjoin = off"))
+        connection.execute(text("SET LOCAL enable_mergejoin = off"))
         sql, parameters = captured[-1]
         plan = connection.exec_driver_sql(
             "EXPLAIN (ANALYZE, FORMAT JSON) " + sql, parameters
@@ -347,6 +358,8 @@ async def test_thousand_node_chain_is_complete_and_under_two_seconds(
         ]
         assert edge_scans
         assert all(node["Actual Loops"] <= 1 for node in edge_scans)
+    with SessionLocal() as next_transaction:
+        assert next_transaction.scalar(text("SHOW jit")) == default_jit
 
 
 def test_detail_uses_three_queries_with_runtime_role(lineage, admin_session):

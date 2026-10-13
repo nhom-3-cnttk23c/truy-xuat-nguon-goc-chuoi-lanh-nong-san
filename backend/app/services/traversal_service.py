@@ -62,6 +62,10 @@ def _roots_and_check_cycle(
 def get_lineage(
     db: Session, principal: Principal, lot_id: UUID, direction: str
 ) -> dict:
+    # This interactive read invokes short, nested RLS queries. Compiling them
+    # with JIT can dominate latency on hosts with different planner statistics.
+    # SET LOCAL applies only to this transaction and never changes DB defaults.
+    db.execute(text("SET LOCAL jit = off"))
     get_tenant_record(db, Lot, lot_id, principal, allow_historical=True)
     ancestors = direction in {"ancestors", "detail"}
     next_column = "parent_lot_id" if ancestors else "child_lot_id"

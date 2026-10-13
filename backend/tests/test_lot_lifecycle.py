@@ -377,7 +377,7 @@ async def test_transfer_clears_location_and_historical_descendants_redact_it(
 
 
 @pytest.mark.asyncio
-async def test_inspector_bulk_descendants_include_location_consumption_in_three_queries(
+async def test_inspector_bulk_descendants_include_location_consumption_in_three_data_queries(
     distribution, admin_session
 ):
     owner, products, identities = distribution
@@ -418,7 +418,12 @@ async def test_inspector_bulk_descendants_include_location_consumption_in_three_
             graph = traversal_service.get_lineage(db, principal, root_id, "descendants")
         finally:
             event.remove(connection, "before_cursor_execute", collect)
-    assert len(queries) == 3, queries
+    # Three data reads remain constant for any node count. The transaction's
+    # JIT setting is one additional command, not a per-node data query.
+    data_queries = [
+        sql for sql in queries if sql.lstrip().startswith(("SELECT", "WITH"))
+    ]
+    assert len(data_queries) == 3 and len(queries) == 4, queries
     assert len(graph["nodes"]) == 21
     for node in graph["nodes"]:
         assert node["current_holder_organization_name"]
