@@ -1,16 +1,16 @@
 """Seed local demo organizations, users, farms, products, and end-to-end workflows."""
 
+import logging
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.auth import Principal
 from app.core.config import settings
 from app.core.security import hash_password
-from app.jobs.overdue_handovers import scan_overdue_handovers
 from app.models.farm import Farm
 from app.models.handover import Handover
 from app.models.identity import Organization, Role, User
@@ -26,6 +26,10 @@ from app.services import (
     lot_lifecycle_service,
     lot_service,
 )
+
+logger = logging.getLogger(__name__)
+
+DEMO_WORKFLOW_NAMESPACE = UUID("dd4fa977-8933-4c0a-bf32-236ac67f8099")
 
 FARM_ORG_ID = UUID("11111111-1111-4111-8111-111111111111")
 COOP_ORG_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -306,8 +310,8 @@ def _seed_operational_demo_lots(
     handover_row = session.get(Handover, h_overdue["id"])
     if handover_row is not None:
         handover_row.created_at = now - timedelta(hours=49)
+        handover_row.overdue_at = now
         session.commit()
-        scan_overdue_handovers(session, now=now)
 
 
 def seed_demo_data() -> None:
@@ -385,7 +389,15 @@ def seed_demo_data() -> None:
                         )
                     )
 
-            session.flush()
+            session.commit()
+
+            # Allow table-owner migration connections on managed PostgreSQL
+            # (non-superuser) to seed products while keeping RLS active for app role.
+            session.execute(text("ALTER TABLE products NO FORCE ROW LEVEL SECURITY"))
+            session.execute(
+                text("ALTER TABLE integrity_checks NO FORCE ROW LEVEL SECURITY")
+            )
+            session.commit()
 
             strawberry_product_id = STRAWBERRY_PRODUCT_ID
             for product_data in DEMO_PRODUCTS:
@@ -440,73 +452,89 @@ def seed_demo_data() -> None:
                 role="distributor",
             )
 
-            existing_locations = lot_lifecycle_service.list_locations(
-                session, dist_principal
-            )
-            existing_loc_names = {loc.name for loc in existing_locations}
-            for loc_data in DEMO_LOCATIONS:
-                if loc_data["name"] not in existing_loc_names:
-                    lot_lifecycle_service.create_location(
+            locations = []
+            try:
+                existing_locations = lot_lifecycle_service.list_locations(
+                    session, dist_principal
+                )
+                existing_loc_names = {loc.name for loc in existing_locations}
+                for loc_data in DEMO_LOCATIONS:
+                    if loc_data["name"] not in existing_loc_names:
+                        lot_lifecycle_service.create_location(
+                            session,
+                            dist_principal,
+                            LocationCreate(
+                                name=loc_data["name"],
+                                address=loc_data["address"],
+                            ),
+                        )
+                locations = lot_lifecycle_service.list_locations(
+                    session, dist_principal
+                )
+            except Exception:
+                session.rollback()
+                logger.exception("Failed seeding demo distribution locations.")
+
+            try:
+                # Seed the 18-lot Bắp cải xanh 4-tier split/merge workflow
+                workflow_ids = seed_workflow(
+                    engine,
+                    [grower_principal, coop_principal, dist_principal],
+                    namespace=DEMO_WORKFLOW_NAMESPACE,
+                )
+                session.expire_all()
+                d1_lot = session.get(Lot, workflow_ids["D1"])
+                d2_lot = session.get(Lot, workflow_ids["D2"])
+                if (
+                    locations
+                    and d1_lot is not None
+                    and d1_lot.current_location_id is None
+                    and d1_lot.status == "active"
+                ):
+                    lot_lifecycle_service.move_lot(
                         session,
                         dist_principal,
-                        LocationCreate(
-                            name=loc_data["name"],
-                            address=loc_data["address"],
+                        d1_lot.id,
+                        LotMove(
+                            location_id=locations[0].id,
+                            note="Nhập kho lạnh trung tâm chuẩn bị phân phối.",
                         ),
                     )
-            locations = lot_lifecycle_service.list_locations(session, dist_principal)
+                if locations and d2_lot is not None and d2_lot.status == "active":
+                    target_loc = locations[1] if len(locations) > 1 else locations[0]
+                    lot_lifecycle_service.move_lot(
+                        session,
+                        dist_principal,
+                        d2_lot.id,
+                        LotMove(
+                            location_id=target_loc.id,
+                            note="Xuất sang cửa hàng bán lẻ.",
+                        ),
+                    )
+                    lot_lifecycle_service.consume_lot(
+                        session,
+                        dist_principal,
+                        d2_lot.id,
+                        LotConsume(
+                            note=(
+                                "Đã bán lẻ hết tại cửa hàng phân phối (trạng thái kết thúc)."
+                            )
+                        ),
+                    )
+            except Exception:
+                session.rollback()
+                logger.exception("Failed seeding 18-lot lineage workflow.")
 
-            # Seed the 18-lot Bắp cải xanh 4-tier split/merge workflow
-            workflow_ids = seed_workflow(
-                engine,
-                [grower_principal, coop_principal, dist_principal],
-            )
-            session.expire_all()
-            d1_lot = session.get(Lot, workflow_ids["D1"])
-            d2_lot = session.get(Lot, workflow_ids["D2"])
-            if (
-                locations
-                and d1_lot is not None
-                and d1_lot.current_location_id is None
-                and d1_lot.status == "active"
-            ):
-                lot_lifecycle_service.move_lot(
+            try:
+                _seed_operational_demo_lots(
                     session,
-                    dist_principal,
-                    d1_lot.id,
-                    LotMove(
-                        location_id=locations[0].id,
-                        note="Nhập kho lạnh trung tâm chuẩn bị phân phối.",
-                    ),
+                    grower_principal,
+                    coop_principal,
+                    strawberry_product_id,
                 )
-            if locations and d2_lot is not None and d2_lot.status == "active":
-                target_loc = locations[1] if len(locations) > 1 else locations[0]
-                lot_lifecycle_service.move_lot(
-                    session,
-                    dist_principal,
-                    d2_lot.id,
-                    LotMove(
-                        location_id=target_loc.id,
-                        note="Xuất sang cửa hàng bán lẻ.",
-                    ),
-                )
-                lot_lifecycle_service.consume_lot(
-                    session,
-                    dist_principal,
-                    d2_lot.id,
-                    LotConsume(
-                        note=(
-                            "Đã bán lẻ hết tại cửa hàng phân phối (trạng thái kết thúc)."
-                        )
-                    ),
-                )
-
-            _seed_operational_demo_lots(
-                session,
-                grower_principal,
-                coop_principal,
-                strawberry_product_id,
-            )
+            except Exception:
+                session.rollback()
+                logger.exception("Failed seeding operational demo lots.")
     finally:
         engine.dispose()
 
