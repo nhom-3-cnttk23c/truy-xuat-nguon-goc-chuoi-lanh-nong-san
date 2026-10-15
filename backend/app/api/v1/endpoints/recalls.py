@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,6 @@ from app.core.database import get_db
 from app.models.event import Event
 from app.models.lot import Lot
 
-
 router = APIRouter()
 
 
@@ -21,7 +20,7 @@ router = APIRouter()
 def list_recall_lots(
     principal: Annotated[Principal, Depends(get_current_principal)],
     db: Annotated[Session, Depends(get_db)],
-    organization_id: UUID | None = Query(default=None),
+   organization_id: UUID | None = None,
 ) -> dict:
     query = select(Lot).order_by(Lot.name)
 
