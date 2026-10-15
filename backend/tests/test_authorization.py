@@ -179,3 +179,31 @@ def test_organization_admin_product_write_is_denied_at_route_boundary():
         enforce_route_permission(request, principal)
 
     assert error.value.status_code == 403
+
+
+@pytest.mark.parametrize("role", ["inspector", "organization_admin", "system_admin"])
+def test_roles_authorized_to_open_recalls(role):
+    assert has_permission(role, "recalls:open") is True
+
+
+@pytest.mark.parametrize(
+    "role", ["grower", "cooperative", "distributor", "transporter"]
+)
+def test_roles_unauthorized_to_open_recalls(role):
+    assert has_permission(role, "recalls:open") is False
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "grower",
+        "cooperative",
+        "distributor",
+        "transporter",
+        "inspector",
+        "organization_admin",
+        "system_admin",
+    ],
+)
+def test_all_authenticated_roles_can_read_recalls(role):
+    assert has_permission(role, "recalls:read") is True
