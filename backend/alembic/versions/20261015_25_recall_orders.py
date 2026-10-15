@@ -153,6 +153,37 @@ def upgrade() -> None:
         """
     )
 
+    op.execute("DROP POLICY IF EXISTS events_insert_tenant ON events")
+    op.execute(
+        """
+        CREATE POLICY events_insert_tenant ON events
+        FOR INSERT
+        WITH CHECK (
+            organization_id = public.app_current_organization_id()
+            AND (
+                EXISTS (
+                    SELECT 1 FROM public.lots AS l
+                    WHERE l.id = events.lot_id
+                      AND l.current_holder_organization_id = public.app_current_organization_id()
+                )
+                OR (
+                    event_type IN ('handover_accepted', 'handover_rejected')
+                    AND EXISTS (
+                        SELECT 1 FROM public.handovers AS h
+                        WHERE h.lot_id = events.lot_id
+                          AND h.to_organization_id = public.app_current_organization_id()
+                          AND h.status = 'pending'
+                    )
+                )
+                OR (
+                    event_type IN ('recall_opened', 'recall_completed')
+                    AND public.app_current_role() IN ('inspector', 'system_admin')
+                )
+            )
+        )
+        """
+    )
+
     role = _application_role()
     if role:
         op.execute(f"GRANT SELECT, INSERT ON recall_orders TO {role}")
@@ -160,4 +191,30 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS events_insert_tenant ON events")
+    op.execute(
+        """
+        CREATE POLICY events_insert_tenant ON events
+        FOR INSERT
+        WITH CHECK (
+            organization_id = public.app_current_organization_id()
+            AND (
+                EXISTS (
+                    SELECT 1 FROM public.lots AS l
+                    WHERE l.id = events.lot_id
+                      AND l.current_holder_organization_id = public.app_current_organization_id()
+                )
+                OR (
+                    event_type IN ('handover_accepted', 'handover_rejected')
+                    AND EXISTS (
+                        SELECT 1 FROM public.handovers AS h
+                        WHERE h.lot_id = events.lot_id
+                          AND h.to_organization_id = public.app_current_organization_id()
+                          AND h.status = 'pending'
+                    )
+                )
+            )
+        )
+        """
+    )
     op.drop_table("recall_orders")
