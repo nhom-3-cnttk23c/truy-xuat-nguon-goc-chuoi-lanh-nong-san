@@ -17,4 +17,6 @@ def test_legacy_revision_08_precedes_harvest_schema_and_handover_migrations():
     assert legacy_release.down_revision == "20261007_07"
     assert harvest_schema.down_revision == "20261007_08"
     assert handover_flow.down_revision == "20261008_15"
-    assert script.get_current_head() == "20261012_24"
+    recall_orders = script.get_revision("20261015_25")
+    assert recall_orders.down_revision == "20261012_24"
+    assert script.get_current_head() == "20261015_25"

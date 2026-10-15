@@ -21,6 +21,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "events:create",
             "handovers:create",
             "handovers:resolve",
+            "recalls:read",
         }
     ),
     "cooperative": frozenset(
@@ -33,6 +34,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "events:create",
             "handovers:create",
             "handovers:resolve",
+            "recalls:read",
         }
     ),
     "transporter": frozenset(
@@ -44,6 +46,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "events:create",
             "handovers:create",
             "handovers:resolve",
+            "recalls:read",
         }
     ),
     "distributor": frozenset(
@@ -58,6 +61,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "events:create",
             "handovers:create",
             "handovers:resolve",
+            "recalls:read",
         }
     ),
     "inspector": frozenset(
@@ -67,6 +71,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "lots:read_all",
             "events:read_all",
             "events:verify",
+            "recalls:open",
+            "recalls:read",
+            "recalls:read_all",
         }
     ),
     "organization_admin": frozenset(
@@ -84,6 +91,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "events:create",
             "handovers:create",
             "handovers:resolve",
+            "recalls:open",
+            "recalls:read",
         }
     ),
     "system_admin": frozenset(
@@ -101,6 +110,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "products:write",
             "products:read_all",
             "security:read",
+            "recalls:open",
+            "recalls:read",
+            "recalls:read_all",
         }
     ),
 }
@@ -117,6 +129,8 @@ def has_permission(role: str, permission: str) -> bool:
     if permission == "events:read" and "events:read_all" in permissions:
         return True
     if permission == "products:read" and "products:read_all" in permissions:
+        return True
+    if permission == "recalls:read" and "recalls:read_all" in permissions:
         return True
     return False
 
