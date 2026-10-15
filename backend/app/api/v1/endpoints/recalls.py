@@ -16,10 +16,16 @@ router = APIRouter()
 
 
 @router.post(
-    "/",
+    "",
     response_model=RecallOrderRead,
     status_code=status.HTTP_201_CREATED,
     summary="Mở lệnh thu hồi cho lô có sự cố",
+)
+@router.post(
+    "/",
+    response_model=RecallOrderRead,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
 )
 @require_permission("recalls:open")
 def open_recall_order(
@@ -31,9 +37,14 @@ def open_recall_order(
 
 
 @router.get(
-    "/",
+    "",
     response_model=list[RecallOrderRead],
     summary="Danh sách lệnh thu hồi",
+)
+@router.get(
+    "/",
+    response_model=list[RecallOrderRead],
+    include_in_schema=False,
 )
 @require_permission("recalls:read")
 def list_recall_orders(

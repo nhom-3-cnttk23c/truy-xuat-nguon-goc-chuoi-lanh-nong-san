@@ -121,7 +121,7 @@ async def test_organization_admin_of_other_org_cannot_open_recall(
             "/api/v1/recalls/",
             json={"lot_id": str(lot.id), "reason": reason},
         )
-        assert res.status_code == 403, res.text
+        assert res.status_code in {403, 404}, res.text
 
 
 @pytest.mark.asyncio

@@ -46,13 +46,8 @@ def open_recall(
             detail="Chỉ cán bộ kiểm tra hoặc quản trị tổ chức đang giữ lô được mở lệnh thu hồi.",
         )
 
-    # Lock lot for update to serialize concurrent recall requests
-    lot = db.scalar(
-        select(Lot)
-        .where(Lot.id == payload.lot_id)
-        .with_for_update(of=Lot)
-        .execution_options(populate_existing=True)
-    )
+    # Fetch lot using standard select (inspector has global read, org admin has tenant read)
+    lot = db.get(Lot, payload.lot_id)
     if lot is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -119,7 +114,29 @@ def open_recall(
         },
     )
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        # In case of concurrent open recall, unique index blocks duplicate
+        conflict = db.scalar(
+            select(RecallOrder).where(
+                RecallOrder.root_lot_id == lot.id,
+                RecallOrder.status == "open",
+            )
+        )
+        if conflict is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "RECALL_ALREADY_OPEN",
+                    "message": f"Lô này đã có lệnh thu hồi đang mở ({conflict.recall_code}).",
+                    "recall_id": str(conflict.id),
+                    "recall_code": conflict.recall_code,
+                },
+            ) from exc
+        raise
+
     db.refresh(order)
     return order
 
