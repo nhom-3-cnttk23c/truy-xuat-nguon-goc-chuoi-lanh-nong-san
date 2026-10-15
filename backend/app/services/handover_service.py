@@ -12,7 +12,7 @@ from app.models.handover import Handover
 from app.models.identity import Organization
 from app.models.lot import Lot
 from app.schemas.handover import HandoverCreate
-from app.services import event_service
+from app.services import event_service, recall_service
 
 PARTICIPANT_ORGANIZATION_TYPES = {"farm", "cooperative", "transport", "distribution"}
 
@@ -105,6 +105,7 @@ def create_handover(db: Session, principal: Principal, payload: HandoverCreate) 
             status_code=status.HTTP_409_CONFLICT,
             detail="Lô không ở trạng thái có thể bàn giao.",
         )
+    recall_service.raise_if_recall_blocked(db, lot.id)
 
     handover = Handover(
         lot_id=lot.id,

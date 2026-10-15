@@ -13,7 +13,7 @@ from app.core.lot_codes import generate_lot_code
 from app.models.lot import Lot
 from app.models.lot_relation import LotRelation
 from app.schemas.lineage import LotMerge, LotSplit
-from app.services import event_service
+from app.services import event_service, recall_service
 from app.services.lot_lifecycle_service import validate_locations
 
 
@@ -46,6 +46,7 @@ def _lock_parents(
                 422,
                 f"Lô {lot.lot_code or lot.name} chưa có nông sản để xác định đơn vị khối lượng.",
             )
+        recall_service.raise_if_recall_blocked(db, lot.id)
     return {lot.id: lot for lot in lots}
 
 

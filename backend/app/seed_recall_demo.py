@@ -227,6 +227,54 @@ def seed_recall_workflow(
             LotConsume(note="Đã xuất bán lẻ ra hệ thống siêu thị tiêu thụ"),
         )
 
+        # Tạo lệnh thu hồi mẫu trên một số lô tại Nhà phân phối
+        from app.models.recall import RecallOrder, RecallOrderLot
+
+        recall_order = RecallOrder(
+            id=uuid5(namespace, "recall-order"),
+            organization_id=principals[2].organization_id,
+            code="RC-2026-001",
+            status="open",
+            note="Lệnh thu hồi mẫu S-38/N3-55.",
+            created_by_user_id=principals[2].user_id,
+        )
+        db.add(recall_order)
+        db.flush()
+
+        for label in ("D1", "E1", "F1"):
+            db.add(
+                RecallOrderLot(
+                    recall_order_id=recall_order.id,
+                    organization_id=principals[2].organization_id,
+                    lot_id=lots[label].id,
+                    incident_flag=True,
+                )
+            )
+
+        # Tạo lệnh thu hồi mẫu trên một số lô tại Nhà phân phối
+        from app.models.recall import RecallOrder, RecallOrderLot
+
+        recall_order = RecallOrder(
+            id=uuid5(namespace, "recall-order"),
+            organization_id=principals[2].organization_id,
+            code="RC-2026-001",
+            status="open",
+            note="Lệnh thu hồi mẫu S-38/N3-55.",
+            created_by_user_id=principals[2].user_id,
+        )
+        db.add(recall_order)
+        db.flush()
+
+        for label in ("D1", "E1", "F1"):
+            db.add(
+                RecallOrderLot(
+                    recall_order_id=recall_order.id,
+                    organization_id=principals[2].organization_id,
+                    lot_id=lots[label].id,
+                    incident_flag=True,
+                )
+            )
+
         db.commit()
         return {label_key: lot.id for label_key, lot in lots.items()}
 

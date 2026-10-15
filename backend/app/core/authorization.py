@@ -101,6 +101,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "products:write",
             "products:read_all",
             "security:read",
+            "recalls:manage",
         }
     ),
 }

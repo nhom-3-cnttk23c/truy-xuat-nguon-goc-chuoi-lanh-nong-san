@@ -7,6 +7,7 @@ from app.models.location import Location
 from app.models.lot import Lot
 from app.models.lot_relation import LotRelation
 from app.models.product import Product
+from app.models.recall import RecallOrder, RecallOrderLot
 
 __all__ = [
     "AuditLog",
@@ -20,6 +21,8 @@ __all__ = [
     "LotRelation",
     "Organization",
     "Product",
+    "RecallOrder",
+    "RecallOrderLot",
     "Role",
     "User",
 ]
