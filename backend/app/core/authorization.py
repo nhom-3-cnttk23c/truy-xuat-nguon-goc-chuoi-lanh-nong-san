@@ -35,6 +35,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "handovers:create",
             "handovers:resolve",
             "recalls:read",
+            "shipments:create",
+            "shipments:read",
+            "shipments:complete",
         }
     ),
     "transporter": frozenset(
@@ -47,6 +50,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "handovers:create",
             "handovers:resolve",
             "recalls:read",
+            "shipments:create",
+            "shipments:read",
+            "shipments:complete",
         }
     ),
     "distributor": frozenset(
@@ -62,6 +68,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "handovers:create",
             "handovers:resolve",
             "recalls:read",
+            "shipments:create",
+            "shipments:read",
+            "shipments:complete",
         }
     ),
     "inspector": frozenset(
@@ -74,6 +83,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "recalls:open",
             "recalls:read",
             "recalls:read_all",
+            "shipments:read",
+            "shipments:read_all",
         }
     ),
     "organization_admin": frozenset(
@@ -93,6 +104,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "handovers:resolve",
             "recalls:open",
             "recalls:read",
+            "shipments:create",
+            "shipments:read",
+            "shipments:complete",
         }
     ),
     "system_admin": frozenset(
@@ -113,6 +127,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "recalls:open",
             "recalls:read",
             "recalls:read_all",
+            "shipments:create",
+            "shipments:read",
+            "shipments:complete",
+            "shipments:read_all",
         }
     ),
 }
@@ -131,6 +149,8 @@ def has_permission(role: str, permission: str) -> bool:
     if permission == "products:read" and "products:read_all" in permissions:
         return True
     if permission == "recalls:read" and "recalls:read_all" in permissions:
+        return True
+    if permission == "shipments:read" and "shipments:read_all" in permissions:
         return True
     return False
 

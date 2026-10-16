@@ -207,3 +207,24 @@ def test_roles_unauthorized_to_open_recalls(role):
 )
 def test_all_authenticated_roles_can_read_recalls(role):
     assert has_permission(role, "recalls:read") is True
+
+
+@pytest.mark.parametrize(
+    "role",
+    ["transporter", "cooperative", "distributor", "organization_admin", "system_admin"],
+)
+def test_roles_authorized_to_manage_shipments(role):
+    assert has_permission(role, "shipments:create") is True
+    assert has_permission(role, "shipments:read") is True
+    assert has_permission(role, "shipments:complete") is True
+
+
+@pytest.mark.parametrize("role", ["grower", "inspector"])
+def test_roles_unauthorized_to_create_shipments(role):
+    assert has_permission(role, "shipments:create") is False
+
+
+def test_inspector_can_read_all_shipments():
+    assert has_permission("inspector", "shipments:read") is True
+    assert has_permission("inspector", "shipments:read_all") is True
+    assert has_permission("inspector", "shipments:complete") is False

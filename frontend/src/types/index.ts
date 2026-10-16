@@ -257,6 +257,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'events:create',
     'handovers:create',
     'handovers:resolve',
+    'recalls:read',
   ],
   cooperative: [
     'lots:transform',
@@ -267,6 +268,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'events:create',
     'handovers:create',
     'handovers:resolve',
+    'recalls:read',
+    'shipments:create',
+    'shipments:read',
+    'shipments:complete',
   ],
   transporter: [
     'auth:session',
@@ -276,6 +281,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'events:create',
     'handovers:create',
     'handovers:resolve',
+    'recalls:read',
+    'shipments:create',
+    'shipments:read',
+    'shipments:complete',
   ],
   distributor: [
     'locations:manage',
@@ -288,6 +297,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'events:create',
     'handovers:create',
     'handovers:resolve',
+    'recalls:read',
+    'shipments:create',
+    'shipments:read',
+    'shipments:complete',
   ],
   inspector: [
     'auth:session',
@@ -295,6 +308,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'lots:read_all',
     'events:read_all',
     'events:verify',
+    'recalls:open',
+    'recalls:read',
+    'recalls:read_all',
+    'shipments:read',
+    'shipments:read_all',
   ],
   organization_admin: [
     'locations:manage',
@@ -310,6 +328,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'events:create',
     'handovers:create',
     'handovers:resolve',
+    'recalls:open',
+    'recalls:read',
+    'shipments:create',
+    'shipments:read',
+    'shipments:complete',
   ],
   system_admin: [
     'auth:session',
@@ -325,6 +348,13 @@ export const ROLE_PERMISSIONS: Record<RoleCode, string[]> = {
     'products:write',
     'products:read_all',
     'security:read',
+    'recalls:open',
+    'recalls:read',
+    'recalls:read_all',
+    'shipments:create',
+    'shipments:read',
+    'shipments:complete',
+    'shipments:read_all',
   ],
 }
 

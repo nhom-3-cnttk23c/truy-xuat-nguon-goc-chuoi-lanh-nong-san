@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     lots,
     products,
     recalls,
+    shipments,
 )
 from app.core.authorization import enforce_route_permission
 
@@ -25,3 +26,4 @@ api_router.include_router(locations.router, prefix="/locations", tags=["location
 api_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(recalls.router, prefix="/recalls", tags=["recalls"])
+api_router.include_router(shipments.router, prefix="/shipments", tags=["shipments"])

@@ -86,6 +86,14 @@ export function EventTimeline({
         return { label: 'Kiểm định chất lượng', color: '#9333ea' }
       case 'delivery':
         return { label: 'Bàn giao phân phối', color: '#059669' }
+      case 'shipment_loaded':
+        return { label: 'Lên xe thùng lạnh', color: '#0284c7' }
+      case 'shipment_unloaded':
+        return { label: 'Xuống xe hoàn tất chuyến', color: '#059669' }
+      case 'recall_opened':
+        return { label: 'Mở lệnh thu hồi', color: '#dc2626' }
+      case 'recall_completed':
+        return { label: 'Hoàn tất thu hồi', color: '#16a34a' }
       default:
         return { label: type, color: '#4b5563' }
     }
