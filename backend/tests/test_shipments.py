@@ -1,5 +1,6 @@
 """Test suite for N3-58: Cold chain shipments with multiple lots and a refrigerated container."""
 
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -189,8 +190,11 @@ async def test_cannot_ship_consumed_lot(request, admin_session):
 
     transporter = identities(role="transporter", organization_type="transport")
     consumed_lot = add_lot(
-        admin_session, transporter, products[0], quantity="0.000", status="consumed"
+        admin_session, transporter, products[0], quantity="10.000", status="active"
     )
+    consumed_lot.remaining_quantity = Decimal("0.000")
+    consumed_lot.status = "consumed"
+    admin_session.commit()
 
     async with client() as api:
         await login(api, transporter)
