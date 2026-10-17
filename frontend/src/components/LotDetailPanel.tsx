@@ -14,6 +14,7 @@ import { LotLifecyclePanel } from './LotLifecyclePanel'
 import { lotStatusLabel } from '../types'
 import { TaskLink } from './TaskLink'
 import { EventCreateForm } from './EventCreateForm'
+import { RecallPanel } from './RecallPanel'
 const LineagePanel = lazy(() => import('./LineagePanel').then(module => ({default: module.LineagePanel})))
 
 interface LotDetailPanelProps {
@@ -70,8 +71,8 @@ export function LotDetailPanel({
   const savingRef = useRef(false)
   const task = new URLSearchParams(window.location.search).get('task')
   const initialView = new URLSearchParams(window.location.search).get('view')
-  const [view, setView] = useState((initialView === 'history' && canReadEvents) || initialView === 'origins' ? initialView : 'overview')
-  const taskAllowed = task === 'split' || task === 'merge' ? canTransform : task === 'move' || task === 'consume' ? canManageDistribution : task === 'handover' ? canCreateHandover : task === 'event' ? canCreateEvents : false
+  const [view, setView] = useState((initialView === 'history' && canReadEvents) || initialView === 'origins' || initialView === 'recall' ? initialView : 'overview')
+  const taskAllowed = task === 'split' || task === 'merge' ? canTransform : task === 'move' || task === 'consume' ? canManageDistribution : task === 'handover' ? canCreateHandover : task === 'event' ? canCreateEvents : task === 'recall' ? true : false
 
   const loadDetails = useCallback(async () => {
     const [lotResult, historyResult, outgoing, incoming, orgOptions] = await Promise.all([
@@ -195,8 +196,9 @@ export function LotDetailPanel({
                     {canCreateHandover && <TaskLink href={`/lots/${lot.id}?task=handover`} secondary>Bàn giao lô</TaskLink>}
                     {canCreateEvents && <TaskLink href={`/lots/${lot.id}?task=event`} secondary>Ghi nhận hoạt động</TaskLink>}
                   </>}
+                  <TaskLink href={`/lots/${lot.id}?task=recall`} secondary>Kế hoạch thu hồi</TaskLink>
                 </div>
-                {lot.status !== 'active' && <p>Lô {statusLabel(lot.status).toLocaleLowerCase('vi-VN')}. Xem lịch sử để kiểm tra các thao tác đã ghi nhận.</p>}
+                {lot.status !== 'active' && <p>Lô {statusLabel(lot.status).toLocaleLowerCase('vi-VN')}. Xem lịch sử hoặc kế hoạch thu hồi để kiểm tra dòng chảy sản phẩm.</p>}
                 {lot.current_holder_organization_id !== organizationId && <p>Bạn đang xem thông tin. Đơn vị đang giữ lô mới có thể thực hiện thao tác.</p>}
                 {handover && <p>Bàn giao gần nhất: {handoverLabel(handover.status)} · {handover.from_organization_name} → {handover.to_organization_name}{handover.overdue_at && handover.status === 'pending' ? ' · Quá hạn xác nhận' : ''}</p>}
               </section>}
@@ -212,11 +214,16 @@ export function LotDetailPanel({
           <Suspense fallback={<section className="panel-card panel-box" aria-busy="true">Đang tải sơ đồ phả hệ…</section>}>
             <LineagePanel key={`${lot.id}:${lot.status}:${lot.current_location_id}`} lotId={lot.id} onOpenLot={onOpenLot} />
           </Suspense>
+
+          <div style={{ marginTop: '1rem' }}>
+            <RecallPanel key={lot.id} lotId={lot.id} onOpenLot={onOpenLot} />
+          </div>
               </>}
             </div>
           </>}
 
           {task && <a className="ds-button ds-button-secondary" href={`/lots/${lot.id}`}>← Quay lại chi tiết lô</a>}
+          {task === 'recall' && <RecallPanel key={lot.id} lotId={lot.id} onOpenLot={onOpenLot} />}
           {task === 'event' && canCreateEvents && lot.current_holder_organization_id === organizationId && lot.status === 'active' && <EventCreateForm lot={lot} />}
 
           {(task === 'split' || task === 'merge') && canTransform && (transformCompleted || (lot.current_holder_organization_id === organizationId && lot.status === 'active')) && (

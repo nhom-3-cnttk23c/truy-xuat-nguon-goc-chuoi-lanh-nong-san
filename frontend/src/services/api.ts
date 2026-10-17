@@ -20,6 +20,7 @@ import type {
   HandoverPayload,
   OrganizationOption,
   DistributionLocation,
+  RecallReport,
 } from '../types'
 
 
@@ -244,6 +245,9 @@ export const getLot = (lotId: string) =>
 
 export const getLineage = (lotId: string, direction: 'ancestors' | 'descendants') =>
   request<Lineage>(`/api/v1/lots/${lotId}/lineage?direction=${direction}`)
+
+export const getLotRecall = (lotId: string) =>
+  request<RecallReport>(`/api/v1/lots/${lotId}/recall`)
 
 export const splitLot = (lotId: string, children: Array<{name: string; quantity: string; location_id?: string | null}>) =>
   request<{parent: Lot; children: Lot[]}>(`/api/v1/lots/${lotId}/split`, {

@@ -112,8 +112,8 @@ export function LineagePanel({ lotId, onOpenLot }: Props) {
         </ReactFlow>
       </div></div>
       <details><summary>Danh sách {lots.length} lô liên quan</summary>
-        <div className="lineage-table-scroll"><table className="data-table source-table"><thead><tr><th>Lô</th><th>Đơn vị giữ</th><th>Địa điểm hiện tại</th><th>Còn lại</th><th>Trạng thái</th></tr></thead>
-          <tbody>{lots.map(lot => <tr key={lot.id}><td><button type="button" onClick={() => lot.historical_only ? showHistory(lot.id) : onOpenLot(lot.id)}>{lot.lot_code ?? lot.id.slice(0,8)}</button></td><td>{lot.current_holder_organization_name ?? 'Chỉ xem lịch sử'}</td><td>{lot.historical_only ? '—' : lot.current_location ? `${lot.current_location.name} · ${lot.current_location.address}` : 'Chưa gán địa điểm'}</td><td>{lot.remaining_quantity ?? '—'} {lot.historical_only ? '' : lot.product?.unit}</td><td>{lotStatusLabel(lot.status)}</td></tr>)}</tbody>
+        <div className="lineage-table-scroll"><table className="data-table source-table"><thead><tr><th>Lô</th><th>Đơn vị giữ</th><th>Địa điểm hiện tại</th><th>Còn lại</th><th>Đã tiêu thụ</th><th>Trạng thái</th></tr></thead>
+          <tbody>{lots.map(lot => <tr key={lot.id}><td><button type="button" onClick={() => lot.historical_only ? showHistory(lot.id) : onOpenLot(lot.id)}>{lot.lot_code ?? lot.id.slice(0,8)}</button></td><td>{lot.current_holder_organization_name ?? 'Chỉ xem lịch sử'}</td><td>{lot.historical_only ? '—' : lot.current_location ? `${lot.current_location.name} · ${lot.current_location.address}` : 'Chưa gán địa điểm'}</td><td>{lot.remaining_quantity ?? '—'} {lot.historical_only ? '' : lot.product?.unit}</td><td>{lot.status === 'consumed' ? `${lot.quantity ?? '0.000'} ${lot.product?.unit ?? ''}` : '0.000'}</td><td>{lotStatusLabel(lot.status)}</td></tr>)}</tbody>
         </table></div>
       </details>
       {historyLotId && <div className="panel-box">

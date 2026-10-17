@@ -90,3 +90,10 @@ test('product form opens as a dialog while the catalogue remains on the page', a
   assert.match(output, /placeholder="Ví dụ: Xoài cát Hòa Lộc"/)
   assert.doesNotMatch(output, /target="_blank"/)
 })
+
+test('N3-51: recall panel renders accessible loading state with busy aria attribute', async () => {
+  const output = html(await load('RecallPanel'), {lotId: lot.id, onOpenLot: () => {}})
+  assert.match(output, /aria-busy="true"/)
+  assert.match(output, /Đang tổng hợp danh sách thu hồi phả hệ/)
+})
+

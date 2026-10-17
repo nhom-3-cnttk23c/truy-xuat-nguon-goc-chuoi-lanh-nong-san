@@ -105,6 +105,52 @@ export interface Lineage {
   root_farms: Farm[]
 }
 
+export interface RecallLotItem {
+  id: string
+  lot_code: string | null
+  name: string
+  tier: number
+  status: 'active' | 'pending_handover' | 'closed' | 'consumed' | 'transferred'
+  is_multi_source_merge: boolean
+  organization_id: string | null
+  current_holder_organization_id: string | null
+  current_holder_organization_name: string | null
+  holder_org_type: OrganizationType | null
+  current_location_id: string | null
+  current_location: DistributionLocation | null
+  quantity: string | null
+  remaining_quantity: string
+  consumed_quantity: string
+  recoverable_quantity: string
+  unit: string | null
+  harvested_on: string | null
+  historical_only: boolean
+  parent_lot_ids: string[]
+}
+
+export interface RecallSummary {
+  root_lot_id: string
+  root_lot_code: string | null
+  root_lot_name: string
+  initial_quantity: string | null
+  unit: string | null
+  total_affected_lots: number
+  total_descendants_count: number
+  total_recoverable_kg: string
+  total_consumed_kg: string
+  involved_organizations_count: number
+  involved_organizations: string[]
+  has_multi_source_merge: boolean
+  has_consumed_lot: boolean
+}
+
+export interface RecallReport {
+  root_lot: RecallLotItem
+  summary: RecallSummary
+  descendants: RecallLotItem[]
+  affected_lots: RecallLotItem[]
+}
+
 export interface LotDetail extends Lot {
   parents: GraphLot[]
   children: GraphLot[]

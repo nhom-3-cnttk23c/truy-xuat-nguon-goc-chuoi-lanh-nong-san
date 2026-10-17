@@ -17,10 +17,12 @@ from app.schemas.lineage import (
 )
 from app.schemas.location import LotConsume, LotMove
 from app.schemas.lot import LotCreate, LotListRead, LotRead
+from app.schemas.recall import RecallReport
 from app.services import (
     lineage_service,
     lot_lifecycle_service,
     lot_service,
+    recall_service,
     traversal_service,
 )
 
@@ -121,3 +123,13 @@ def get_lot(
     db: Annotated[Session, Depends(get_db)],
 ) -> dict:
     return traversal_service.get_detail(db, principal, lot_id)
+
+
+@router.get("/{lot_id}/recall", response_model=RecallReport)
+@require_permission("lots:read")
+def get_lot_recall(
+    lot_id: UUID,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    return recall_service.get_recall_report(db, principal, lot_id)
