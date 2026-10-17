@@ -75,9 +75,7 @@ def list_recall_lots(
             Lot.current_holder_organization_id == principal.organization_id
         )
     elif organization_id is not None:
-        query = query.where(
-            Lot.current_holder_organization_id == organization_id
-        )
+        query = query.where(Lot.current_holder_organization_id == organization_id)
 
     lots = db.scalars(query).all()
 
@@ -96,18 +94,14 @@ def list_recall_lots(
         if consumed_event is not None:
             consumed_quantity = lot.quantity or 0
         else:
-            consumed_quantity = (lot.quantity or 0) - (
-                lot.remaining_quantity or 0
-            )
+            consumed_quantity = (lot.quantity or 0) - (lot.remaining_quantity or 0)
 
         remaining_quantity = lot.remaining_quantity or 0
 
         organization = lot.current_holder_organization
         location = lot.current_location
 
-        organization_name = (
-            organization.name if organization is not None else None
-        )
+        organization_name = organization.name if organization is not None else None
         location_name = location.name if location is not None else None
 
         item = {
@@ -121,9 +115,7 @@ def list_recall_lots(
             ),
             "organization_name": organization_name,
             "location_id": (
-                str(lot.current_location_id)
-                if lot.current_location_id
-                else None
+                str(lot.current_location_id) if lot.current_location_id else None
             ),
             "location_name": location_name,
             "quantity": float(lot.quantity or 0),
@@ -134,9 +126,7 @@ def list_recall_lots(
             "status": lot.status,
         }
 
-        result_by_organization[organization_name or "Chưa xác định"].append(
-            item
-        )
+        result_by_organization[organization_name or "Chưa xác định"].append(item)
 
     organizations = []
 
@@ -148,9 +138,7 @@ def list_recall_lots(
                 "total_recoverable_quantity": sum(
                     item["recoverable_quantity"] for item in items
                 ),
-                "total_market_quantity": sum(
-                    item["market_quantity"] for item in items
-                ),
+                "total_market_quantity": sum(item["market_quantity"] for item in items),
             }
         )
 
